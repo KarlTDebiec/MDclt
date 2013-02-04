@@ -1,7 +1,7 @@
 #!/usr/bin/python
 
 desc = """hdf5_functions.py
-    HDF5 functions
+    Functions for transferring data in and out of HDF5 files
     Written by Karl Debiec on 13-02-03
     Last updated 13-02-03"""
 ########################################### MODULES, SETTINGS, AND DEFAULTS ############################################
@@ -10,6 +10,14 @@ import h5py
 import numpy as np
 np.set_printoptions(precision = 3, suppress = True, linewidth = 120)
 #################################################### HDF5 FUNCTIONS ####################################################
+def get_hierarchy(hdf5_file):
+    hdf5_file = h5py.File(hdf5_file)
+    hierarchy = {}
+    def get_hierarchy(x, y): hierarchy[x] = y
+    hdf5_file.visititems(get_hierarchy)
+    hdf5_file.close()
+    return sorted([str(k) for k in hierarchy.keys()])
+
 def process_default(new_data):  return new_data
 def process_mindist(new_data):  return np.min(new_data, axis = 2)
 def shape_default(shapes):
@@ -17,6 +25,7 @@ def shape_default(shapes):
     else:                       return np.array([np.sum(shapes, axis = 0)[0]] +  list(shapes[0,1:]))
 def shape_mindist(shapes):      return np.array([np.sum(shapes, axis = 0)[0], shapes[0,1]])
 def path_to_index(address):     return "[\'{0}\']".format('\'][\''.join(address.strip('/').split('/')))
+
 def process_hdf5_data(hdf5_file, task_list):
     data        = {}
     hdf5_file   = h5py.File(hdf5_file)
@@ -43,6 +52,7 @@ def process_hdf5_data(hdf5_file, task_list):
         hdf5_file.flush()
         hdf5_file.close()
         return data
+
 def add_data(hdf5_file, new_data):
     hdf5_file   = h5py.File(hdf5_file)
     try:

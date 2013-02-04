@@ -1,31 +1,22 @@
 #!/usr/bin/python
 
 desc = """analysis_toolkit.py
-    Manager for analysis of simulations
+    Toolkit for analysis of simulations
     From trajectory location, hdf5 database, and list of analyses constructs task list
     Splits tasks among designated number of cores and saves results to hdf5
     Written by Karl Debiec on 12-02-12
-    Last updated 13-01-25"""
-
+    Last updated 13-02-03"""
 ########################################### MODULES, SETTINGS, AND DEFAULTS ############################################
-import importlib, os, sys
+import importlib, inspect, os, sys
 import h5py as h5
 import numpy as np
-from multiprocessing import Pool
+from   multiprocessing import Pool
+module_path     = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
+sys.path       += [module_path + "/primary_functions"]
+sys.path       += [module_path + "/secondary_functions"]
+sys.path       += [module_path + "/cython_functions"]
+from   hdf5_functions import get_hierarchy
 np.set_printoptions(precision = 3, suppress = True, linewidth = 120)
-
-################################################## GENERAL FUNCTIONS ###################################################
-def is_num(test):
-    try:    float(test)
-    except: return False
-    return  True
-def get_hierarchy(hdf5_file):
-    hdf5_file = h5.File(hdf5_file)
-    hierarchy = {}
-    def get_hierarchy(x, y): hierarchy[x] = y
-    hdf5_file.visititems(get_hierarchy)
-#    hdf5_file.close()
-    return sorted([str(k) for k in hierarchy.keys()])
 #################################################### CORE FUNCTIONS ####################################################
 def make_task_list(hierarchy, jobsteps, analyses, modules):
     checkers    = {}
@@ -69,17 +60,31 @@ def complete_tasks(n_cores, hdf5_file, task_list):
 def pool_director(task):
     function, arguments = task
     return function(arguments)
-######################################################### MAIN #########################################################
-def analyze(hdf5_file, path, package, analyses, n_cores = 1):
+
+def analyze_trajectory(hdf5_file, path, package, analyses, n_cores = 1):
     sys.stderr.write("Analyzing {0} trajectory at {1}.\n".format(package, path.replace('//','/')))
-    modules     = {}
+    modules         = {}
     for m in set([m.split('.')[0] for m in analyses.keys()] + [package]):
-        modules[m]  = importlib.import_module('analysis_' + m)
+        print m
+        modules[m]  = importlib.import_module(m)
     hierarchy   = get_hierarchy(hdf5_file)
     jobsteps    = modules[package].jobsteps(path)
     task_list   = make_task_list(hierarchy, jobsteps, analyses, modules)
     sys.stderr.write("{0} tasks to be completed for {1} jobsteps using {2} cores.\n".format(len(task_list),
       len(jobsteps), n_cores))
     complete_tasks(n_cores, hdf5_file, task_list)
+
+def analyze_post(hdf5_file, analyses, n_cores = 1):
+    sys.stderr.write("Analyzing dataset in {0}.\n".format(hdf5_file))
+    modules         = {}
+    for m in set([m.split('.')[0] for m in analyses.keys()]):
+        modules[m]  = importlib.import_module(m)
+    hierarchy   = get_hierarchy(hdf5_file)
+
+######################################################### MAIN #########################################################
+if __name__ == '__main__':
+    pass
+    
+
 
 
