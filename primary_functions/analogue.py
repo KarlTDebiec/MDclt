@@ -3,16 +3,16 @@
 desc = """analogue.py
     Functions for analysis of amino acid analogue trajectories
     Written by Karl Debiec on 12-11-30
-    Last updated 13-02-03"""
+    Last updated 13-02-04"""
 ########################################### MODULES, SETTINGS, AND DEFAULTS ############################################
-import importlib, os, sys
+import os, sys
 import numpy as np
 import MDAnalysis as md
 from   trajectory_cython import cy_distance_pbc
 ################################################## ANALYSIS FUNCTIONS ##################################################
 def com(arguments):
     """ Calculates center of mass distance between two residue types; assumes cubic box and pbc """
-    jobstep, topology, trajectory, alg1, alg2 = arguments
+    segment, topology, trajectory, alg1, alg2 = arguments
     trj         = md.Universe(topology, trajectory)
     alg1s       = [r.atoms for r in trj.residues if r.name == alg1]
     alg2s       = [r.atoms for r in trj.residues if r.name == alg2]
@@ -23,19 +23,19 @@ def com(arguments):
         for alg1_i, alg1 in enumerate(alg1s):  alg1s_com[alg1_i] = np.array(alg1.centerOfMass(), dtype = np.float64)
         for alg2_i, alg2 in enumerate(alg2s):  alg2s_com[alg2_i] = np.array(alg2.centerOfMass(), dtype = np.float64)
         distances[frame_i]  = cy_distance_pbc(alg1s_com, alg2s_com, float(frame.dimensions[0]))
-    return  [("/" + jobstep + "/association_com",   distances),
-             ("/" + jobstep + "/association_com",   {'units': "A"})]
-def check_com(hierarchy, jobstep, arguments):
-    jobstep, path, topology, trajectory = jobstep
+    return  [("/" + segment + "/association_com",   distances),
+             ("/" + segment + "/association_com",   {'units': "A"})]
+def check_com(hierarchy, segment, arguments):
+    segment, path, topology, trajectory = segment
     alg1, alg2                          = arguments
     if not os.path.isfile(topology):    return False
     if not os.path.isfile(trajectory):  return False
-    if not jobstep + "/association_com" in hierarchy:   return [(com, (jobstep, topology, trajectory, alg1, alg2))]
+    if not segment + "/association_com" in hierarchy:   return [(com, (segment, topology, trajectory, alg1, alg2))]
     else:                                               return False
 
 #def salt_bridge(arguments):
 #    """ salt bridge analysis, assumes cubic box and pbc """
-#    jobstep, topology, trajectory = arguments
+#    segment, topology, trajectory = arguments
 #    trj             = md.Universe(topology, trajectory)
 #    O_negative      = trj.selectAtoms("(resname ACT and (type O))")
 #    N_positive      = trj.selectAtoms("(resname GND and (type N))")
@@ -59,12 +59,12 @@ def check_com(hierarchy, jobstep, arguments):
 #        all_denticity  += [denticity]
 #    all_mindist     = np.reshape(np.concatenate(all_mindist),   (50, frame_i + 1))
 #    all_denticity   = np.reshape(np.concatenate(all_denticity), (50, frame_i + 1))
-#    return [("/" + jobstep + "/salt_bridge/GND_ACT/min_dist",  all_mindist),
-#            ("/" + jobstep + "/salt_bridge/GND_ACT/denticity", all_denticity),
-#            ("/" + jobstep + "/salt_bridge/GND_ACT/min_dist",  {'units': "A"})]
-#def check_salt_bridge(hierarchy, jobstep, arguments):
-#    jobstep, path, topology, trajectory = jobstep
-#    if not jobstep + "/salt_bridge" in hierarchy:   return [(salt_bridge, (jobstep, topology, trajectory))]
+#    return [("/" + segment + "/salt_bridge/GND_ACT/min_dist",  all_mindist),
+#            ("/" + segment + "/salt_bridge/GND_ACT/denticity", all_denticity),
+#            ("/" + segment + "/salt_bridge/GND_ACT/min_dist",  {'units': "A"})]
+#def check_salt_bridge(hierarchy, segment, arguments):
+#    segment, path, topology, trajectory = segment
+#    if not segment + "/salt_bridge" in hierarchy:   return [(salt_bridge, (segment, topology, trajectory))]
 #    else:                                           return False
 
 

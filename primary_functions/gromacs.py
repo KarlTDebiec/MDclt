@@ -9,16 +9,16 @@ import commands, os, sys
 import numpy as np
 from   standard_functions import is_num, month
 #################################################### CORE FUNCTIONS ####################################################
-def jobsteps(path):
-    jobsteps = []
+def segments(path):
+    segments = []
     for f in sorted([f for f in os.listdir(path) if is_num(f)]):
-        jobsteps += [(f, "{0}/{1}/".format(path, f), "{0}/{1}/{1}_solute.pdb".format(path, f),
+        segments += [(f, "{0}/{1}/".format(path, f), "{0}/{1}/{1}_solute.pdb".format(path, f),
                       "{0}/{1}/{1}_solute.xtc".format(path, f))]
-    return jobsteps
+    return segments
 ################################################## ANALYSIS FUNCTIONS ##################################################
 def energy(arguments):
-    """ parses energy log using provided format, including start time, assumes 1 ns jobstep length """
-    jobstep, log, logtype = arguments
+    """ parses energy log using provided format, including start time, assumes 1 ns segment length """
+    segment, log, logtype = arguments
     nsteps              = float(commands.getoutput("grep nsteps    " + log).split()[2])
     nstlog              = float(commands.getoutput("grep nstlog    " + log).split()[2])
     delta_t             = float(commands.getoutput("grep delta_t   " + log).split()[2])
@@ -29,7 +29,7 @@ def energy(arguments):
     raw                 = [l.split() for l in log.readlines()]
     log.close()
     attributes          = {'decomposition': np.zeros((2, 3), dtype = np.int)}
-    time                = np.arange(dt, length * dt + dt, dt) + float(jobstep)
+    time                = np.arange(dt, length * dt + dt, dt) + float(segment)
     potential_energy    = np.zeros(length)
     kinetic_energy      = np.zeros(length)
     total_energy        = np.zeros(length)
@@ -68,39 +68,39 @@ def energy(arguments):
                 if -1 < i < length:
                     pressure[i]             = float(raw[j + 1][1])
                 i                          += 1
-    return [("/" + jobstep + "/time",               time),
-            ("/" + jobstep + "/energy_total",       total_energy     * 0.239005736),
-            ("/" + jobstep + "/energy_potential",   potential_energy * 0.239005736),
-            ("/" + jobstep + "/energy_kinetic",     kinetic_energy   * 0.239005736),
-            ("/" + jobstep + "/temperature",        temperature),
-            ("/" + jobstep + "/pressure",           pressure),
-            ("/" + jobstep,                         attributes),
-            ("/" + jobstep + "/time",               {'units': "ns"}),
-            ("/" + jobstep + "/energy_total",       {'units': "kcal / mol"}),
-            ("/" + jobstep + "/energy_potential",   {'units': "kcal / mol"}),
-            ("/" + jobstep + "/energy_kinetic",     {'units': "kcal / mol"}),
-            ("/" + jobstep + "/temperature",        {'units': "K"}),
-            ("/" + jobstep + "/pressure",           {'units': "Bar"})]
-def check_energy(hierarchy, jobstep, arguments):
-    jobstep, path, topology, trajectory = jobstep
+    return [("/" + segment + "/time",               time),
+            ("/" + segment + "/energy_total",       total_energy     * 0.239005736),
+            ("/" + segment + "/energy_potential",   potential_energy * 0.239005736),
+            ("/" + segment + "/energy_kinetic",     kinetic_energy   * 0.239005736),
+            ("/" + segment + "/temperature",        temperature),
+            ("/" + segment + "/pressure",           pressure),
+            ("/" + segment,                         attributes),
+            ("/" + segment + "/time",               {'units': "ns"}),
+            ("/" + segment + "/energy_total",       {'units': "kcal / mol"}),
+            ("/" + segment + "/energy_potential",   {'units': "kcal / mol"}),
+            ("/" + segment + "/energy_kinetic",     {'units': "kcal / mol"}),
+            ("/" + segment + "/temperature",        {'units': "K"}),
+            ("/" + segment + "/pressure",           {'units': "Bar"})]
+def check_energy(hierarchy, segment, arguments):
+    segment, path, topology, trajectory = segment
     logtype                             = arguments
-    if not (set([jobstep + "/time",           jobstep + "/energy_total", jobstep + "/energy_potential",
-                 jobstep + "/energy_kinetic", jobstep + "/temperature",  jobstep + "/pressure"]).issubset(hierarchy)):
-        log     = "{0}/{1}.log".format(path, jobstep)
-        return    [(energy, (jobstep, log, logtype))]
+    if not (set([segment + "/time",           segment + "/energy_total", segment + "/energy_potential",
+                 segment + "/energy_kinetic", segment + "/temperature",  segment + "/pressure"]).issubset(hierarchy)):
+        log     = "{0}/{1}.log".format(path, segment)
+        return    [(energy, (segment, log, logtype))]
     else:   return False
 
 #def mindist(arguments):
-#    jobstep, prefix, path = arguments
+#    segment, prefix, path = arguments
 #    tpr     = "{0}/{1}.tpr".format(path, prefix)
 #    xtc     = "{0}/{1}.xtc".format(path, prefix)
-#    xvg     = "{0}/mindist.xvg".format(path, jobstep)
+#    xvg     = "{0}/mindist.xvg".format(path, segment)
 #    command = "echo 1 | g_mindist -f {0} -s {1} -od {2} -pi".format(xtc, tpr, xvg)
 #    commands.getoutput(command)
 #    data    = np.loadtxt(xvg, skiprows = 24)
 #    os.remove(xvg)
-#    return [("/" + jobstep + "/mindist/min_pbc",    data[:,1] * 10.),
-#            ("/" + jobstep + "/mindist/max_int",    data[:,2] * 10.),
-#            ("/" + jobstep + "/mindist/min_pbc",    {'units': "A"}),
-#            ("/" + jobstep + "/mindist/max_int",    {'units': "A"})]
+#    return [("/" + segment + "/mindist/min_pbc",    data[:,1] * 10.),
+#            ("/" + segment + "/mindist/max_int",    data[:,2] * 10.),
+#            ("/" + segment + "/mindist/min_pbc",    {'units': "A"}),
+#            ("/" + segment + "/mindist/max_int",    {'units': "A"})]
 

@@ -3,12 +3,11 @@
 desc = """hdf5_functions.py
     Functions for transferring data in and out of HDF5 files
     Written by Karl Debiec on 13-02-03
-    Last updated 13-02-03"""
+    Last updated 13-02-04"""
 ########################################### MODULES, SETTINGS, AND DEFAULTS ############################################
-import importlib, os, sys
+import os, sys
 import h5py
 import numpy as np
-np.set_printoptions(precision = 3, suppress = True, linewidth = 120)
 #################################################### HDF5 FUNCTIONS ####################################################
 def get_hierarchy(hdf5_file):
     hdf5_file = h5py.File(hdf5_file)
@@ -53,23 +52,18 @@ def process_hdf5_data(hdf5_file, task_list):
         hdf5_file.close()
         return data
 
-def add_data(hdf5_file, new_data):
-    hdf5_file   = h5py.File(hdf5_file)
-    try:
-        for item in new_data:
-            address, item   = item
-            address         = [a for a in address.split('/') if a != '']
-            name            = address.pop()
-            group           = hdf5_file
-            for subgroup in address:
-                if   (subgroup in dict(group)): group = group[subgroup]
-                else:                           group = group.create_group(subgroup)
-            if (type(item) == dict):
-                for key, value in item.iteritems(): group[name].attrs[key] = value
-            else:
-                if (name in dict(group)): del group[name]
-                try:    group.create_dataset(name, data = item, compression = 'gzip')
-                except: raise
-    finally:
-        hdf5_file.flush()
-        hdf5_file.close()
+def add_data(hdf5_file, path, data):
+    path    = [p for p in path.split('/') if p != '']
+    name    = path.pop()
+    group   = hdf5_file
+    for subgroup in path:
+        if   (subgroup in dict(group)): group = group[subgroup]
+        else:                           group = group.create_group(subgroup)
+    if (type(data) == dict):
+        for key, value in data.iteritems(): group[name].attrs[key] = value
+    else:
+        if (name in dict(group)): del group[name]
+        group.create_dataset(name, data = data, compression = 'gzip')
+        print "    '{0}' added".format('/'.join(path + [name]))
+
+

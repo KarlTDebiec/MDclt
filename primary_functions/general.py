@@ -3,39 +3,39 @@
 desc = """general.py
     Functions for analysis of molecular dynamics trajectories
     Written by Karl Debiec on 12-11-30
-    Last updated 13-02-03"""
+    Last updated 13-02-04"""
 ########################################### MODULES, SETTINGS, AND DEFAULTS ############################################
-import importlib, os, sys
+import os, sys
 import numpy as np
 import MDAnalysis as md
 import MDAnalysis.analysis.align as mdaa
 import scipy.spatial.distance as ssd
-from   trajectory_cython import cy_contact, cy_distance_pbc
+from   trajectory_cython  import cy_contact, cy_distance_pbc
 from   standard_functions import is_num, contact_2D_to_1D_indexes
 ################################################## ANALYSIS FUNCTIONS ##################################################
 def com(arguments):
     """ Calculates center of mass of selected group """
-    jobstep, name, group, topology, trajectory = arguments
+    segment, name, group, topology, trajectory = arguments
     trj         = md.Universe(topology, trajectory)
     com         = np.zeros((len(trj.trajectory), 3), dtype = np.float)
     trj_sel     = trj.selectAtoms(group)
     n_atoms     = trj_sel.numberOfAtoms()
     for frame_i, frame in enumerate(trj.trajectory):
         com[frame_i]    = trj_sel.centerOfMass()
-    return  [("/" + jobstep + "/com_" + name, com),
-             ("/" + jobstep + "/com_" + name, {'group': group, 'units': "A"})]
-def check_com(hierarchy, jobstep, arguments):
-    jobstep, path, topology, trajectory = jobstep
+    return  [("/" + segment + "/com_" + name, com),
+             ("/" + segment + "/com_" + name, {'group': group, 'units': "A"})]
+def check_com(hierarchy, segment, arguments):
+    segment, path, topology, trajectory = segment
     task_list   = []
     for name, group in arguments:
-        if not jobstep + "/com_" + name in hierarchy:
-            task_list  += [(com, (jobstep, name, group, topology, trajectory))]
+        if not segment + "/com_" + name in hierarchy:
+            task_list  += [(com, (segment, name, group, topology, trajectory))]
     if task_list != []: return task_list
     else:               return False
 
 def rmsd(arguments):
     """ Calculates rmsd of selected group against provided reference """
-    jobstep, name, fit, reference, topology, trajectory = arguments
+    segment, name, fit, reference, topology, trajectory = arguments
     ref         = md.Universe(reference)
     trj         = md.Universe(topology, trajectory)
     rmsd        = np.zeros((len(trj.trajectory)),       dtype = np.float)
@@ -47,22 +47,22 @@ def rmsd(arguments):
     for frame_i, frame in enumerate(trj.trajectory):
         trj_frame       = (trj_sel.coordinates() - trj_sel.centerOfMass()).T.astype('float64')
         rmsd[frame_i]   = mdaa.qcp.CalcRMSDRotationalMatrix(ref_frame, trj_frame, n_atoms, rotmat[frame_i], None)
-    return  [("/" + jobstep + "/rmsd_"   + name,    rmsd),
-             ("/" + jobstep + "/rotmat_" + name,    rotmat),
-             ("/" + jobstep + "/rmsd_"   + name,    {'fit': fit,    'units': "A"}),
-             ("/" + jobstep + "/rotmat_" + name,    {'fit': fit})]
-def check_rmsd(hierarchy, jobstep, arguments):
-    jobstep, path, topology, trajectory = jobstep
+    return  [("/" + segment + "/rmsd_"   + name,    rmsd),
+             ("/" + segment + "/rotmat_" + name,    rotmat),
+             ("/" + segment + "/rmsd_"   + name,    {'fit': fit,    'units': "A"}),
+             ("/" + segment + "/rotmat_" + name,    {'fit': fit})]
+def check_rmsd(hierarchy, segment, arguments):
+    segment, path, topology, trajectory = segment
     task_list   = []
     for name, fit, reference in arguments:
-        if not (set([jobstep + "/rmsd_" + name, jobstep + "/rotmat_" + name]).issubset(hierarchy)):
-            task_list  += [(rmsd, (jobstep, name, fit, reference, topology, trajectory))]
+        if not (set([segment + "/rmsd_" + name, segment + "/rotmat_" + name]).issubset(hierarchy)):
+            task_list  += [(rmsd, (segment, name, fit, reference, topology, trajectory))]
     if task_list != []: return task_list
     else:               return False
 
 def contact(arguments):
     """ Calculates inter-residue contacts, defined as heavy-atom minimum distance within 5.5 Angstrom """
-    jobstep, topology, trajectory = arguments
+    segment, topology, trajectory = arguments
     trj         = md.Universe(topology, trajectory)
     trj_sel     = trj.selectAtoms("(protein or resname ACE) and (name C* or name N* or name O* or name S*)")
     n_res       = len(trj_sel.residues)
@@ -72,14 +72,14 @@ def contact(arguments):
     indexes     = contact_2D_to_1D_indexes(n_res)
     for frame_i, frame in enumerate(trj.trajectory):
         contacts[frame_i]   = cy_contact(trj_sel.coordinates().T.astype('float64'), atomcounts, indexes)
-    return  [("/" + jobstep + "/contact",  contacts)]
-def check_contact(hierarchy, jobstep, arguments):
-    jobstep, path, topology, trajectory = jobstep
-    if not jobstep + "/contact" in hierarchy:   return [(contact, (jobstep, topology, trajectory))]
+    return  [("/" + segment + "/contact",  contacts)]
+def check_contact(hierarchy, segment, arguments):
+    segment, path, topology, trajectory = segment
+    if not segment + "/contact" in hierarchy:   return [(contact, (segment, topology, trajectory))]
     else:                                       return False
 
 #def mindist(arguments):
-#    jobstep, topology, trajectory, name, group_1, group_2 = arguments
+#    segment, topology, trajectory, name, group_1, group_2 = arguments
 #    trj         = md.Universe(topology, trajectory)
 #    group1      = trj.selectAtoms(group1)
 #    group2      = trj.selectAtoms(group2)
@@ -89,13 +89,13 @@ def check_contact(hierarchy, jobstep, arguments):
 #        group2_crd          = np.array(group2.coordinates(), dtype = np.float64)
 #        distances[frame_i]  = distance_pbc(group1_crd, group2_crd, float(frame.dimensions[0]))
 #    mindists = np.min(np.min(distances, axis = 1), axis = 1)
-#    return  [("/" + jobstep + "/min_dist" + name,   mindists),
-#             ("/" + jobstep + "/min_dist" + name,   {'units': "A", 'group 1': group_1, 'group 2': group_2})]
+#    return  [("/" + segment + "/min_dist" + name,   mindists),
+#             ("/" + segment + "/min_dist" + name,   {'units': "A", 'group 1': group_1, 'group 2': group_2})]
 
 
 
 #def salt_bridge(arguments):
-#    jobstep, topology, trajectory, forced = arguments
+#    segment, topology, trajectory, forced = arguments
 #    trj         = md.Universe(topology, trajectory)
 #    protein     = trj.selectAtoms("protein")
 #    N_positive  = trj.selectAtoms("(resname ARG or resname HIS or resname LYS) and (type N) and not (name N)")
@@ -133,8 +133,8 @@ def check_contact(hierarchy, jobstep, arguments):
 #            if   (len(set(contact_atoms[:,0])) >= 2 and len(set(contact_atoms[:,1])) >= 2): denticity[frame_i] = 2
 #            else:                                                                           denticity[frame_i] = 1
 #        if (len(distance.shape) != 1):  distance    = np.min(distance, axis = 0)
-#        final_array += [("/" + jobstep + "/salt_bridge/" + name + "/min_dist",   distance),
-#                        ("/" + jobstep + "/salt_bridge/" + name + "/denticity",  denticity),
-#                        ("/" + jobstep + "/salt_bridge/" + name + "/min_dist",   {'units': "A"})]
+#        final_array += [("/" + segment + "/salt_bridge/" + name + "/min_dist",   distance),
+#                        ("/" + segment + "/salt_bridge/" + name + "/denticity",  denticity),
+#                        ("/" + segment + "/salt_bridge/" + name + "/min_dist",   {'units': "A"})]
 #    return final_array
 

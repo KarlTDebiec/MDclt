@@ -8,5 +8,5 @@ import numpy as np
 setup(
     cmdclass        = {'build_ext': build_ext},
     include_dirs    = [np.get_include()],
-    ext_modules     = [Extension("trajectory_cython", ["trajectory_cython.pyx"])]
+    ext_modules     = [Extension("cython_functions", ["cython_functions.pyx"])]
 )

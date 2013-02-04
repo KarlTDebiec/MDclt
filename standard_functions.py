@@ -7,6 +7,14 @@ desc = """standard_functions.py
 ########################################### MODULES, SETTINGS, AND DEFAULTS ############################################
 import os, sys
 import numpy as np
+################################################ SEGMENT LIST FUNCTIONS ################################################
+def segments_standard(path):
+    segments = []
+    for f in sorted([f for f in os.listdir(path) if is_num(f)]):
+        segments += [(f, "{0}/{1}/".format(path, f),
+                         "{0}/{1}/{1}_solute.pdb".format(path, f),
+                         "{0}/{1}/{1}_solute.xtc".format(path, f))]
+    return segments
 ################################################## GENERAL FUNCTIONS ###################################################
 def is_num(test):
     try:    float(test)
