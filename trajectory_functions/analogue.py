@@ -5,7 +5,7 @@ desc = """analogue.py
     Written by Karl Debiec on 12-11-30
     Last updated 13-02-03"""
 ########################################### MODULES, SETTINGS, AND DEFAULTS ############################################
-import os, sys
+import importlib, os, sys
 import numpy as np
 import MDAnalysis as md
 from   trajectory_cython import cy_distance_pbc

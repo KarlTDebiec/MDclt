@@ -1,26 +1,17 @@
 #!/usr/bin/python
 
 desc = """general.py
-    Functions for general analysis of trajectories
+    Functions for analysis of molecular dynamics trajectories
     Written by Karl Debiec on 12-11-30
     Last updated 13-02-03"""
 ########################################### MODULES, SETTINGS, AND DEFAULTS ############################################
-import os, sys, time
+import importlib, os, sys
 import numpy as np
 import MDAnalysis as md
 import MDAnalysis.analysis.align as mdaa
 import scipy.spatial.distance as ssd
 from   trajectory_cython import cy_contact, cy_distance_pbc
-################################################## GENERAL FUNCTIONS ###################################################
-def is_num(test):
-    try:    float(test)
-    except: return False
-    return  True
-def month(string):
-    month = {'jan':  1, 'feb':  2, 'mar':  3, 'apr':  4, 'may':  5, 'jun':  6,
-             'jul':  7, 'aug':  8, 'sep':  9, 'oct': 10, 'nov': 11, 'dec': 12}
-    try:    return month[string.lower()]
-    except: return None
+from   standard_functions import is_num, contact_2D_to_1D_indexes
 ################################################## ANALYSIS FUNCTIONS ##################################################
 def com(arguments):
     """ Calculates center of mass of selected group """
@@ -78,7 +69,7 @@ def contact(arguments):
     atomcounts  = np.array([len(R.selectAtoms("(name C* or name N* or name O* or name S*)")) for R in trj_sel.residues])
     atomcounts  = np.array([(np.sum(atomcounts[:i]), np.sum(atomcounts[:i]) + n) for i, n in enumerate(atomcounts)])
     contacts    = np.zeros((len(trj.trajectory), (n_res**2-n_res)/2), dtype = np.int8)
-    indexes     = _contact_2D_to_1D_indexes(n_res)
+    indexes     = contact_2D_to_1D_indexes(n_res)
     for frame_i, frame in enumerate(trj.trajectory):
         contacts[frame_i]   = cy_contact(trj_sel.coordinates().T.astype('float64'), atomcounts, indexes)
     return  [("/" + jobstep + "/contact",  contacts)]
@@ -86,31 +77,6 @@ def check_contact(hierarchy, jobstep, arguments):
     jobstep, path, topology, trajectory = jobstep
     if not jobstep + "/contact" in hierarchy:   return [(contact, (jobstep, topology, trajectory))]
     else:                                       return False
-def _contact_1D_to_2D_map(contact_1D):
-    n_res       = int(1 + np.sqrt(1 + 8 * contact_1D.size)) / 2
-    indexes     = _contact_1D_to_2D_indexes(n_res)
-    contact_2D  = np.zeros((n_res, n_res), dtype = np.int8)
-    contact_2D[indexes[:,0], indexes[:,1]]  = contact_1D
-    contact_2D[indexes[:,1], indexes[:,0]]  = contact_1D
-    contact_2D[range(n_res), range(n_res)]  = 1
-    return contact_2D
-def _contact_2D_to_1D_indexes(n_res):
-    indexes = np.zeros((n_res,n_res), dtype = np.int)
-    i       = 0
-    for j in range(n_res-1):
-        for k in range(j+1,n_res):
-            indexes[j, k]   = i
-            i              += 1
-    return indexes
-def _contact_1D_to_2D_indexes(n_res):
-    indexes = np.zeros(((n_res**2-n_res)/2,2), dtype = np.int)
-    i       = 0
-    for j in range(n_res-1):
-        for k in range(j+1,n_res):
-            indexes[i]  = [j, k]
-            i          += 1
-    return indexes
-    pass
 
 #def mindist(arguments):
 #    jobstep, topology, trajectory, name, group_1, group_2 = arguments

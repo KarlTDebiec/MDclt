@@ -5,9 +5,9 @@ desc = """desmond.py
     Written by Karl Debiec on 12-11-30
     Last updated 13-02-03"""
 ########################################### MODULES, SETTINGS, AND DEFAULTS ############################################
-import commands, os, sys
+import commands, importlib, os, sys
 import numpy as np
-from   general import is_num, month
+from   standard_functions import is_num, month
 #################################################### CORE FUNCTIONS ####################################################
 def jobsteps(path):
     jobsteps = []

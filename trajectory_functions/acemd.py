@@ -7,7 +7,7 @@ desc = """acemd.py
 ########################################### MODULES, SETTINGS, AND DEFAULTS ############################################
 import commands, os, sys
 import numpy as np
-from   general import is_num
+from   standard_functions import is_num
 #################################################### CORE FUNCTIONS ####################################################
 def jobsteps(path):
     jobsteps = []
