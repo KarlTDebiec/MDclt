@@ -5,7 +5,7 @@ desc = """analysis_toolkit.py
     From trajectory location, hdf5 database, and list of analyses constructs task list
     Splits tasks among designated number of cores and saves results to hdf5
     Written by Karl Debiec on 12-02-12
-    Last updated 13-02-04"""
+    Last updated 13-02-07"""
 ########################################### MODULES, SETTINGS, AND DEFAULTS ############################################
 import inspect, os, sys
 import h5py
@@ -16,48 +16,83 @@ module_path     = os.path.dirname(os.path.abspath(inspect.getfile(inspect.curren
 sys.path       += [module_path + "/primary_functions"]
 sys.path       += [module_path + "/secondary_functions"]
 sys.path       += [module_path + "/cython_functions"]
-from   hdf5_functions import get_hierarchy, add_data
+from   hdf5_functions import get_hierarchy, load_data, add_data
 np.set_printoptions(precision = 3, suppress = True, linewidth = 120)
 #################################################### CORE FUNCTIONS ####################################################
-def make_task_list(hierarchy, segments, analyses):
-    checkers    = {}
-    task_list   = []
+def _primary_make_task_list(hierarchy, segments, analyses):
+    check_functions = {}
+    task_list       = []
     for analysis, module, function in [[a] + a.split('.') for a in analyses]:
-        checkers[analysis]  = getattr(sys.modules[module], 'check_' + function)
-    for segment in segments[:20]:
+        check_function              = getattr(sys.modules[module], 'check_' + function)
+        check_functions[analysis]   = check_function
+    for segment in segments:
         for analysis, arguments in analyses.iteritems():
-            check   = checkers[analysis](hierarchy, segment, arguments)
+            check   = check_functions[analysis](hierarchy, segment, arguments)
             if check: task_list  += check
     return task_list
-def complete_tasks(hdf5_file, task_list, n_cores = 1):
+def _primary_complete_tasks(hdf5_file, task_list, n_cores = 1):
     pool    = Pool(n_cores)
-    try:
-        hdf5_file   = h5py.File(hdf5_file)
-        for result in pool.imap_unordered(pool_director, task_list):
-            if  not result: continue
-            for path, data in result:
-                add_data(hdf5_file, path, data)
-    finally:
-        hdf5_file.flush()
-        hdf5_file.close()
-        pool.close()
-        pool.join()
-def pool_director(task):
+    for result in pool.imap_unordered(_primary_pool_director, task_list):
+        if  not result:             continue
+        for path, data in result:   add_data(hdf5_file, path, data)
+    pool.close()
+    pool.join()
+def _primary_pool_director(task):
     function, arguments = task
     return function(arguments)
-
-def analyze_primary(hdf5_file, path, segment_lister, analyses, n_cores = 1):
+def analyze_primary(hdf5_filename, path, segment_lister, analyses, n_cores = 1):
+    """ Performs primary analysis (analysis of trajectory directly)
+        1) Checks data already present in <hdf5_file>
+        2) Builds list of trajectory segments at <path> using function <segment_lister>
+        3) Builds task list based on requested <analyses>, data present in <hdf5_file>, and segments at <path>
+        4) Distributes tasks across <n_cores> and writes results to <hdf5_file>"""
     sys.stderr.write("Analyzing trajectory at {0}.\n".format(path.replace('//','/')))
     for module_name in set([m.split('.')[0] for m in analyses.keys() + [segment_lister]]):  import_module(module_name)
-    hierarchy       = get_hierarchy(hdf5_file)
+    hierarchy       = get_hierarchy(hdf5_filename)
     segments        = getattr(sys.modules[segment_lister.split('.')[0]], segment_lister.split('.')[1])(path)
-    task_list       = make_task_list(hierarchy, segments, analyses)
+    task_list       = _primary_make_task_list(hierarchy, segments, analyses)
     sys.stderr.write("{0} tasks to be completed for {1} segments using {2} cores.\n".format(len(task_list),
       len(segments), n_cores))
-    complete_tasks(hdf5_file, task_list, n_cores)
+    hdf5_file       = h5py.File(hdf5_filename)
+    _primary_complete_tasks(hdf5_file, task_list, n_cores)
+    hdf5_file.flush()
+    hdf5_file.close()
 
-######################################################### MAIN #########################################################
-if __name__ == '__main__':
-    pass
+def _secondary_make_path_list(analyses):
+    # ADD ABILITY TO INCLUDE MULTIPLE COPIES OF SAME SOURCE WITH DIFFERENT PROCESSING E.G. ASSOCIATION VS PMF
+    path_list = []
+    for module, function in [a.split('.') for a in analyses]:
+        path_function   = getattr(sys.modules[module], 'path_' + function)
+        path_list       += path_function()
+    return list(set(path_list))
+def _secondary_make_task_list(analyses):
+    check_functions = {}
+    task_list       = []
+    for analysis, module, function in [[a] + a.split('.') for a in analyses]:
+        check_function              = getattr(sys.modules[module], 'check_' + function)
+        check_functions[analysis]   = check_function
+    for analysis, arguments in analyses.iteritems():
+        check   = check_functions[analysis](arguments)
+        if check: task_list  += check
+    return task_list
+def _secondary_complete_tasks(hdf5_file, primary_data, task_list, n_cores = 1):
+    for function, arguments in task_list:
+        results = function(primary_data, arguments, n_cores)
+        if  not results:            continue
+        for path, data in results:  add_data(hdf5_file, path, data)
+def analyze_secondary(hdf5_filename, analyses, n_cores = 1):
+    """ Performs secondary analysis (analysis of primary analysis)
+        1) Builds list of data required from <hdf5_filename> by <analyses>
+        2) Loads required data from <hdf5_filename>
+        3) Builds task list based on <analyses>
+        4) Completes tasks in serial using <n_cores> if implemented for that task and writes results to <hdf5_file>"""
+    for module_name in set([m.split('.')[0] for m in analyses.keys()]):  import_module(module_name)
+    path_list       = _secondary_make_path_list(analyses)
+    hdf5_file       = h5py.File(hdf5_filename)
+    primary_data    = load_data(hdf5_file, path_list)
+    task_list       = _secondary_make_task_list(analyses)
+    _secondary_complete_tasks(hdf5_file, primary_data, task_list, n_cores = 1)
+    hdf5_file.flush()
+    hdf5_file.close()
 
 
