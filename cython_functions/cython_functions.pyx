@@ -1,13 +1,13 @@
 #!/usr/bin/python
 
 ########################################### MODULES, SETTINGS, AND DEFAULTS ############################################
-from __future__ import division
+from   __future__ import division
 import os, sys
 import numpy as np
 
 cimport numpy as np
 cimport cython
-from libc.math cimport sqrt
+from    libc.math cimport sqrt
 
 FLOAT64 = np.float64
 LONG    = np.long
@@ -28,7 +28,7 @@ cdef inline double apply_pbc(double d, double maxcut, double mincut, double leng
 def cy_distance_pbc(np.ndarray[FLOAT64_t, ndim = 2] group1_crd,
                     np.ndarray[FLOAT64_t, ndim = 2] group2_crd,
                     double                          length):
-    """ Calculates distance between two groups of coordinates within a pbc box of provided length """
+    """ Calculates distance between coordinate sets <group1_crd> and <group2_crd>  within a cubic pbc box of <length> """
     cdef np.ndarray[FLOAT64_t, ndim = 2]    distance    = np.zeros((group1_crd.shape[0], group2_crd.shape[0]), dtype=FLOAT64)
     cdef np.ndarray[FLOAT64_t, ndim = 1]    d_xyz       = np.zeros((3), dtype = FLOAT64)
     cdef unsigned int                       A1_i, A2_i
@@ -48,7 +48,8 @@ def cy_distance_pbc(np.ndarray[FLOAT64_t, ndim = 2] group1_crd,
 def cy_contact(np.ndarray[FLOAT64_t, ndim = 2] crd,
                np.ndarray[LONG_t,    ndim = 2] atomcounts,
                np.ndarray[LONG_t,    ndim = 2] indexes):
-    """ Calculates inter-residue contacts from coordinates, atom indexes, and 2D-1D conversion matrix """
+    """ Calculates inter-residue contacts from coordinates <crd>, atom indexes <atomcounts>, and 2D to 1D conversion
+        matrix <indexes>"""
     cdef unsigned int                       n_res       = atomcounts.shape[0]
     cdef unsigned int                       R1_i, R2_i, A1_i, A2_i
     cdef float                              distance

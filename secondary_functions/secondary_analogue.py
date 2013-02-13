@@ -1,9 +1,9 @@
 #!/usr/bin/python
 
 desc = """secondary_analogue.py
-    Functions for analysis of amino acid analogue datasets
+    Functions for secondary analysis of amino acid analogue datasets
     Written by Karl Debiec on 12-08-15
-    Last updated 13-02-07"""
+    Last updated 13-02-08"""
 ########################################### MODULES, SETTINGS, AND DEFAULTS ############################################
 import os, sys
 import numpy as np
@@ -40,6 +40,8 @@ def shape_association(shapes):      return np.array([np.sum(shapes, axis = 0)[0]
 def process_association(new_data):  return np.min(new_data, axis = 2)
 ################################################## ANALYSIS FUNCTIONS ##################################################
 def association_com(primary_data, arguments, n_cores):
+    """ Calculates Ka, kon, and koff of <n_alg1> and <n_alg2> in cubic box of <side length> with bound state defined as
+        <cutoff> Angstrom """
     side_length, n_alg1, n_alg2, cutoff = arguments
     time            = primary_data['*/time']
     com_dist        = primary_data['*/association_com']
@@ -104,7 +106,7 @@ def association_com(primary_data, arguments, n_cores):
              ("/association_com/fpt/fpt_off",               fpt_off),
              ("/association_com/fpt/fpt_off",               {'units': 'ns'}),
              ("/association_com/fpt",                       {'time': time[-1]})]
-def path_association_com():
+def path_association_com(arguments):
     return [('*/time',              (shape_default,     process_default,     postprocess_default)),
             ('*/association_com',   (shape_association, process_association, postprocess_default))]
 def check_association_com(arguments):

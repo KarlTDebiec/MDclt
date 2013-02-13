@@ -1,23 +1,16 @@
 #!/usr/bin/python
 
 desc = """gromacs.py
-    Functions for analysis of Gromacs trajectories
+    Functions for primary analysis of Gromacs trajectories
     Written by Karl Debiec on 12-11-30
-    Last updated 13-02-03"""
+    Last updated 13-02-08"""
 ########################################### MODULES, SETTINGS, AND DEFAULTS ############################################
 import commands, os, sys
 import numpy as np
 from   standard_functions import is_num, month
-#################################################### CORE FUNCTIONS ####################################################
-def segments(path):
-    segments = []
-    for f in sorted([f for f in os.listdir(path) if is_num(f)]):
-        segments += [(f, "{0}/{1}/".format(path, f), "{0}/{1}/{1}_solute.pdb".format(path, f),
-                      "{0}/{1}/{1}_solute.xtc".format(path, f))]
-    return segments
 ################################################## ANALYSIS FUNCTIONS ##################################################
 def energy(arguments):
-    """ parses energy log using provided format, including start time, assumes 1 ns segment length """
+    """ parses <log>  of <logtype> for <segment>; assumes 1 ns segment length """
     segment, log, logtype = arguments
     nsteps              = float(commands.getoutput("grep nsteps    " + log).split()[2])
     nstlog              = float(commands.getoutput("grep nstlog    " + log).split()[2])

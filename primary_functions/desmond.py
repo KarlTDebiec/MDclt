@@ -1,16 +1,16 @@
 #!/usr/bin/python
 
 desc = """desmond.py
-    Functions for analysis of Desmond trajectories
+    Functions for primary analysis of Desmond trajectories
     Written by Karl Debiec on 12-11-30
-    Last updated 13-02-04"""
+    Last updated 13-02-08"""
 ########################################### MODULES, SETTINGS, AND DEFAULTS ############################################
 import commands, os, sys
 import numpy as np
 from   standard_functions import is_num, month
 ################################################## ANALYSIS FUNCTIONS ##################################################
 def energy(arguments):
-    """ parses energy log, including start time """
+    """ parses <ene> for <segment> """
     segment, ene    = arguments
     data            = np.loadtxt(ene)
     head            = commands.getoutput("head -n 3 {0}".format(ene)).split('\n')[2].split()

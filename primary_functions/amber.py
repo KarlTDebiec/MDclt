@@ -1,16 +1,16 @@
 #!/usr/bin/python
 
 desc = """amber.py
-    Functions for analysis of AMBER trajectories
+    Functions for primary analysis of AMBER trajectories
     Written by Karl Debiec on 12-12-01
-    Last updated 13-02-04"""
+    Last updated 13-02-08"""
 ########################################### MODULES, SETTINGS, AND DEFAULTS ############################################
 import commands, os, sys
 import numpy as np
 from   standard_functions import is_num
 ################################################## ANALYSIS FUNCTIONS ##################################################
 def energy(arguments):
-    """ parses energy log using provided format, including start time, assumes 1 ns segment length """
+    """ Parses <log> for <segment> """
     segment, log        = arguments
     nstlim              = float(commands.getoutput("grep nstlim " + log).split()[2][:-1])
     ntpr                = float(commands.getoutput("grep ntpr   " + log).split()[2][:-1])

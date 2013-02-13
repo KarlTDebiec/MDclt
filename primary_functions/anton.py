@@ -1,16 +1,17 @@
 #!/usr/bin/python
 
 desc = """anton.py
-    Functions for analysis of Anton trajectories
+    Functions for primary analysis of Anton trajectories
     Written by Karl Debiec on 12-11-29
-    Last updated 13-02-04"""
+    Last updated 13-02-08"""
 ########################################### MODULES, SETTINGS, AND DEFAULTS ############################################
 import commands, os, sys
 import numpy as np
 from   standard_functions import is_num, month
 ################################################## ANALYSIS FUNCTIONS ##################################################
 def energy(arguments):
-    """ Parses energy log, either calculated on Anton or generated afterwards using vrun """
+    """ Parses <ene> for <segment>
+        may be either calculated on Anton or generated afterwards using vrun """
     segment, ene    = arguments
     try:    data    = np.loadtxt(ene)
     except: return None

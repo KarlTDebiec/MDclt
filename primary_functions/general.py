@@ -1,9 +1,9 @@
 #!/usr/bin/python
 
 desc = """general.py
-    Functions for analysis of molecular dynamics trajectories
+    Functions for primary analysis of molecular dynamics trajectories
     Written by Karl Debiec on 12-11-30
-    Last updated 13-02-04"""
+    Last updated 13-02-08"""
 ########################################### MODULES, SETTINGS, AND DEFAULTS ############################################
 import os, sys
 import numpy as np
@@ -14,7 +14,7 @@ from   trajectory_cython  import cy_contact, cy_distance_pbc
 from   standard_functions import is_num, contact_2D_to_1D_indexes
 ################################################## ANALYSIS FUNCTIONS ##################################################
 def com(arguments):
-    """ Calculates center of mass of selected group """
+    """ Calculates center of mass of <name> with selection <group> from <topology> and <trajectory> for <segment> """
     segment, name, group, topology, trajectory = arguments
     trj         = md.Universe(topology, trajectory)
     com         = np.zeros((len(trj.trajectory), 3), dtype = np.float)
@@ -34,7 +34,7 @@ def check_com(hierarchy, segment, arguments):
     else:               return False
 
 def rmsd(arguments):
-    """ Calculates rmsd of selected group against provided reference """
+    """ Calculates rmsd of <name> relative to <reference> with <fit> from <topology> and trajectory> for <segment> """
     segment, name, fit, reference, topology, trajectory = arguments
     ref         = md.Universe(reference)
     trj         = md.Universe(topology, trajectory)
@@ -61,7 +61,8 @@ def check_rmsd(hierarchy, segment, arguments):
     else:               return False
 
 def contact(arguments):
-    """ Calculates inter-residue contacts, defined as heavy-atom minimum distance within 5.5 Angstrom """
+    """ Calculates inter-residue contacts from <topology> and <trajectory> for <segment>
+        Contact defined as heavy-atom minimum distance within 5.5 Angstrom """
     segment, topology, trajectory = arguments
     trj         = md.Universe(topology, trajectory)
     trj_sel     = trj.selectAtoms("(protein or resname ACE) and (name C* or name N* or name O* or name S*)")

@@ -3,7 +3,7 @@
 desc = """hdf5_functions.py
     Functions for transferring data in and out of HDF5 files
     Written by Karl Debiec on 13-02-03
-    Last updated 13-02-07"""
+    Last updated 13-02-08"""
 ########################################### MODULES, SETTINGS, AND DEFAULTS ############################################
 import os, sys
 import h5py
@@ -11,6 +11,7 @@ import numpy as np
 from   standard_functions import is_num
 #################################################### HDF5 FUNCTIONS ####################################################
 def get_hierarchy(hdf5_filename):
+    """ Returns sorted list of paths present in <hdf5_filename> """
     hdf5_file = h5py.File(hdf5_filename)
     hierarchy = {}
     def get_hierarchy(x, y): hierarchy[x] = y
@@ -24,6 +25,7 @@ def process_default(new_data):  return new_data
 def postprocess_default(data):  return data
 def path_to_index(address):     return "[\'{0}\']".format('\'][\''.join(address.strip('/').split('/')))
 def load_data(hdf5_file, paths):
+    """ Loads data stored at <paths> from <hdf5_file> """
     data        = {}
     segments    = sorted([s for s in hdf5_file if is_num(s)])
     for path, functions in paths:
@@ -31,8 +33,10 @@ def load_data(hdf5_file, paths):
         else:                    data[path] = load_complete_dataset(hdf5_file, path_to_index(path), functions)
     return data
 def load_complete_dataset(hdf5_file, index, processor):
+    """ Loads data stored at <index> from <hdf5_file> and processes with <processor> """
     return  processor(np.array(eval("hdf5_file{0}[...])".format(index))))
 def load_split_dataset(hdf5_file, segments, index, functions):
+    """ Loads data stored at <index> from <segments> of <hdf5_file> and processes with <functions> """
     shaper, processor, postprocessor = functions
     shapes          = np.array([eval("hdf5_file['{0}']{1}.shape".format(segment, index)) for segment in segments])
     total_shape     = shaper(shapes)
@@ -45,6 +49,7 @@ def load_split_dataset(hdf5_file, segments, index, functions):
     return postprocessor(data)
 
 def add_data(hdf5_file, path, data):
+    """ Adds <data> to <hdf5_file> at <path> """
     path    = [p for p in path.split('/') if p != '']
     name    = path.pop()
     group   = hdf5_file

@@ -1,16 +1,16 @@
 #!/usr/bin/python
 
 desc = """acemd.py
-    Functions for analysis of ACEMD trajectories
+    Functions for primary analysis of ACEMD trajectories
     Written by Karl Debiec on 12-11-30
-    Last updated 13-02-04"""
+    Last updated 13-02-08"""
 ########################################### MODULES, SETTINGS, AND DEFAULTS ############################################
 import commands, os, sys
 import numpy as np
 from   standard_functions import is_num
 ################################################# ANALYSIS FUNCTIONS ##################################################
 def energy(arguments):
-    """ parses energy log, calculates time based on configuration file """
+    """ Parses <log> and <conf> for <segment> """
     segment, log, conf  = arguments
     data        = np.genfromtxt(log, skip_header = 1, invalid_raise = False)[1:,:]
     command     = "grep \"timestep                            \"  {0}".format(conf)

@@ -2,10 +2,8 @@
 
 desc = """analysis_toolkit.py
     Toolkit for analysis of molecular dynamics simulations
-    From trajectory location, hdf5 database, and list of analyses constructs task list
-    Splits tasks among designated number of cores and saves results to hdf5
     Written by Karl Debiec on 12-02-12
-    Last updated 13-02-07"""
+    Last updated 13-02-08"""
 ########################################### MODULES, SETTINGS, AND DEFAULTS ############################################
 import inspect, os, sys
 import h5py
@@ -59,11 +57,11 @@ def analyze_primary(hdf5_filename, path, segment_lister, analyses, n_cores = 1):
     hdf5_file.close()
 
 def _secondary_make_path_list(analyses):
-    # ADD ABILITY TO INCLUDE MULTIPLE COPIES OF SAME SOURCE WITH DIFFERENT PROCESSING E.G. ASSOCIATION VS PMF
     path_list = []
-    for module, function in [a.split('.') for a in analyses]:
-        path_function   = getattr(sys.modules[module], 'path_' + function)
-        path_list       += path_function()
+    for analysis, arguments in analyses.iteritems():
+        module, function    = analysis.split('.')
+        path_function       = getattr(sys.modules[module], 'path_' + function)
+        path_list          += path_function(arguments)
     return list(set(path_list))
 def _secondary_make_task_list(analyses):
     check_functions = {}
@@ -86,12 +84,13 @@ def analyze_secondary(hdf5_filename, analyses, n_cores = 1):
         2) Loads required data from <hdf5_filename>
         3) Builds task list based on <analyses>
         4) Completes tasks in serial using <n_cores> if implemented for that task and writes results to <hdf5_file>"""
+    sys.stderr.write("Analyzing file {0}.\n".format(hdf5_filename))
     for module_name in set([m.split('.')[0] for m in analyses.keys()]):  import_module(module_name)
     path_list       = _secondary_make_path_list(analyses)
     hdf5_file       = h5py.File(hdf5_filename)
     primary_data    = load_data(hdf5_file, path_list)
     task_list       = _secondary_make_task_list(analyses)
-    _secondary_complete_tasks(hdf5_file, primary_data, task_list, n_cores = 1)
+    _secondary_complete_tasks(hdf5_file, primary_data, task_list, n_cores)
     hdf5_file.flush()
     hdf5_file.close()
 

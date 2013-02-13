@@ -3,12 +3,13 @@
 desc = """standard_functions.py
     Standard functions
     Written by Karl Debiec on 13-02-03
-    Last updated 13-02-03"""
+    Last updated 13-02-08"""
 ########################################### MODULES, SETTINGS, AND DEFAULTS ############################################
 import os, sys
 import numpy as np
 ################################################ SEGMENT LIST FUNCTIONS ################################################
 def segments_standard(path):
+    """ Lists segment folders, topologies, and trajectories  at <path>, assuming the format ####/####.* """
     segments = []
     for f in sorted([f for f in os.listdir(path) if is_num(f)]):
         segments += [(f, "{0}/{1}/".format(path, f),
@@ -27,14 +28,16 @@ def month(string):
     except: return None
 ################################################## ANALYSIS FUNCTIONS ##################################################
 def contact_1D_to_2D_map(contact_1D):
+    """ Converts a 1D (sparse) contact map <contact_1D> to a 2D (complete) contact map """
     n_res       = int(1 + np.sqrt(1 + 8 * contact_1D.size)) / 2
-    indexes     = _contact_1D_to_2D_indexes(n_res)
+    indexes     = contact_1D_to_2D_indexes(n_res)
     contact_2D  = np.zeros((n_res, n_res), dtype = np.int8)
     contact_2D[indexes[:,0], indexes[:,1]]  = contact_1D
     contact_2D[indexes[:,1], indexes[:,0]]  = contact_1D
     contact_2D[range(n_res), range(n_res)]  = 1
     return contact_2D
 def contact_2D_to_1D_indexes(n_res):
+    """ Generates indexes for conversion of 2D (complete) contact map to a 1D (sparse) contact map of <n_res> """
     indexes = np.zeros((n_res,n_res), dtype = np.int)
     i       = 0
     for j in range(n_res-1):
@@ -43,6 +46,7 @@ def contact_2D_to_1D_indexes(n_res):
             i              += 1
     return indexes
 def contact_1D_to_2D_indexes(n_res):
+    """ Generates indexes for conversion of 1D (sparse) contact map to a 2D (complete) contact map of <n_res> """
     indexes = np.zeros(((n_res**2-n_res)/2,2), dtype = np.int)
     i       = 0
     for j in range(n_res-1):
