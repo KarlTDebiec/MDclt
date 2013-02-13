@@ -54,14 +54,18 @@ def process_rotmat(new_data):       return np.reshape(new_data, (new_data.shape[
 ################################################## ANALYSIS FUNCTIONS ##################################################
 def anisotropic(primary_data, arguments, n_cores = 1):
     domain      = arguments['domain']
-    tau_finites = np.array(arguments['tau_finite']) if 'tau_finite' in arguments else np.array([5])
-    n_vectors   = arguments['n_vectors']            if 'n_vectors'  in arguments else 1000
-    time_full   = primary_data['*/time']
-    rotmat_full = primary_data['*/rotmat_' + domain]
+    tau_finites = np.array(arguments['tau_finite']) if 'tau_finite'  in arguments else np.array([5])
+    n_vectors   = arguments['n_vectors']            if 'n_vectors'   in arguments else 1000
+    index_slice = arguments['index_slice']          if 'index_slice' in arguments else 1
+    time_full   = primary_data['*/time'][::index_slice]
+    rotmat_full = primary_data['*/rotmat_' + domain][::index_slice]
     vectors     = _random_unit_vectors(n_vectors)
     size        = time_full.size
     dt          = time_full[1] - time_full[0]
-    new_data    = [("/rotation_" + domain + "/tau_finite", tau_finites),
+    if index_slice != 1:
+        domain += "/slice_{0}/".format(index_slice)
+    new_data    = [("/rotation_" + domain,                 {'n_vectors': n_vectors, 'dt': dt}),
+                   ("/rotation_" + domain + "/tau_finite", tau_finites),
                    ("/rotation_" + domain + "/tau_finite", {'units': 'ns'})]
     splits      = [("full",      "[:]"),         ("half/1",    "[:size/2]"),       ("half/2",    "[size/2:]"),
                    ("quarter/1", "[:size/4]"),   ("quarter/2", "[size/4:size/2]"), ("quarter/3", "[size/2:3*size/4]"),
@@ -72,33 +76,39 @@ def anisotropic(primary_data, arguments, n_cores = 1):
         rotmat  = eval("rotmat_full{0}".format(index))
         Ds      = np.zeros((tau_finites.size, 3, 3))
         for i, tau_finite in enumerate(np.array(tau_finites)):
-            print tau_finite
+            print "{0} ".format(tau_finite),
             tau_indexes = np.array(range(0, int(tau_finite / dt) + 1))
             tau_times   = np.arange(0, tau_finite + dt, dt)
             tau_ls      = np.zeros(vectors.shape[0])
             arguments   = [(j, vector, rotmat, tau_indexes, tau_times, tau_finite, dt)
                             for j, vector in enumerate(vectors)]
             pool        = Pool(n_cores)
-            for result in pool.imap_unordered(_anisotropic, arguments):
+            for k, result in enumerate(pool.imap_unordered(_anisotropic, arguments)):
                 j, tau_l    = result
                 tau_ls[j]   = tau_l
             pool.close()
             pool.join()
-            d_locals_t  = np.transpose(np.mat(1 / (6 * tau_ls))) * 2
+            d_locals_t  = np.transpose(np.mat(1 / (6 * tau_ls)))
             A           = _A(vectors)
             Q           = np.squeeze(np.array(np.mat(np.linalg.pinv(A)) * np.mat(d_locals_t)))
             D           =  _Q_1D_to_D_2D(Q)
             _, P        = np.linalg.eig(D)
             Ds[i]       = np.mat(np.linalg.inv(P)) * np.mat(D) * np.mat(P)
         print Ds
+        Dx, Dy, Dz  = sorted([Ds[-1,0,0], Ds[-1,1,1], Ds[-1,2,2]])
+        D_average   =  (Dx + Dy + Dz) / 3
+        anisotropy  = (2 * Dz) / (Dx + Dy)
+        rhombicity  = (1.5 * (Dy - Dx)) / (Dz - 0.5 * (Dx + Dy))
+        print
+        print "D_AVERAGE ", D_average
+        print "ANISOTROPY", anisotropy
+        print "RHOMBICITY", rhombicity
         new_data   += [("/rotation_" + domain + "/" + path + "/D", Ds),
-                       ("/rotation_" + domain + "/" + path + "/D", {'units':     'ns-1',
-                                                                    'n_vectors': n_vectors,
-                                                                    'time':      time.size * dt,})]
-#            Dx, Dy, Dz  = sorted([D[0,0], D[1,1], D[2,2]])
-#            D_average   =  (Dx + Dy + Dz) / 3
-#            anisotropy  = (2 * Dz) / (Dx + Dy)
-#            rhombicity  = (1.5 * (Dy - Dx)) / (Dz - 0.5 * (Dx + Dy))
+                       ("/rotation_" + domain + "/" + path + "/D", {'units': 'ns-1',
+                                                                    'time':  time.size * dt,})]
+
+    print new_data
+    return False
     return new_data
 def path_anisotropic(arguments):
     return  [('*/time',                          (shape_default, process_default, postprocess_default)),
