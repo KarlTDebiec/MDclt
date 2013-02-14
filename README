@@ -1,0 +1,48 @@
+Molecular Dynamics Analysis Toolkit README
+
+    Karl Debiec
+    karl.t.debiec@gmail.com
+
+
+The Molecular Dynamics Analysis Toolkit is a set of functions intended to simplify analysis of molecular dynamics
+trajectories. MDAT aims to automate (i.e. hide) tedious steps of analysis such as looping over multiple files, storing
+the results in a database, and splitting calculation across multiple cores. MDAT makes use of external libraries
+including h5py, MDAnalysis, and Cython; use of the Enthought Python Distribution is recommended. Analyses are split
+into primary (of trajectories and associated logs) and secondary (of primary analyses). The corresponding functions
+are analyze_primary and analyze_secondary, and they are probably best explained by example:
+
+    from analysis_toolkit import analyze_primary
+
+    analyze_primary(
+        n_cores         = 8,
+        hdf5_filename   = "ubiquitin.hdf5",
+        path            = "/home/13-01_01_Ubiquitin_AMBER99SB_SPCE",
+        segment_lister  = "standard_functions.segments_standard",
+        analyses        = {"amber.energy": "",
+                           "general.rmsd": [["ubiquitin",
+                                             "protein and name CA and resid 3:71",
+                                             "/home/13-01-01_Ubiquitin_AMBER99SB_SPCE/1UBQ.pdb"]]})
+
+This function call will look at the the trajectory at "/home/13-01_01_Ubiquitin_AMBER99SB_SPCE" and use the function
+"standard_functions.segments_standard" to list the trajectory segments present. It will conduct two analyses, the
+function "energy" in the module "amber" and the function "rmsd" in the module "general". The first function parses
+Amber's energy log, while the second calculates the RMSD relative to a template. It will first check "ubiqutin.hdf5"
+to see what analyses have been previously completed, and generate a task list for those that remain. Those tasks will
+be split across 8 cores, and the results stored in "ubiquitin.hdf5"
+
+    from analysis_toolkit import analyze_secondary
+
+    analyze_secondary(
+        n_cores         = 8,
+        hdf5_filename   = "ubiquitin.hdf5",
+        analyses        = {"secondary_rotation.anisotropic": {"domain":     "ubiquitin",
+                                                              "n_vectors":  1000,
+                                                              "tau_finite": range(1,11)}})
+
+This function call with apply the secondary analysis function "anisotropic" from the module "secondary_rotation" to
+the primary data stored in "ubiquitin.hdf5". The parameters "domain", "n_vectors", and "tau_finite", are passed to the
+function, and the results stored in "ubiqutin.hdf5"
+
+The program presently requires data to be organized as <SEGMENT_#>/<SEGMENT_#>.*, thought this is intended to be
+easily modified.
+

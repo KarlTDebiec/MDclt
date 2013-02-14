@@ -40,8 +40,12 @@ def shape_association(shapes):      return np.array([np.sum(shapes, axis = 0)[0]
 def process_association(new_data):  return np.min(new_data, axis = 2)
 ################################################## ANALYSIS FUNCTIONS ##################################################
 def association_com(primary_data, arguments, n_cores):
-    """ Calculates Ka, kon, and koff of <n_alg1> and <n_alg2> in cubic box of <side length> with bound state defined as
-        <cutoff> Angstrom """
+    """ Calculates Ka, kon, and koff of <n_alg1> molecules of type 1 and <n_alg2> molecules of type 2 in cubic box of
+        <side length> with the bound state defined as center of mass distance below <cutoff> Angstrom. Follows the
+        protocol of Piana, S., Lindorff-Larsen, K., Shaw, D.E. How Robust Are Protein Folding Simulations with Respect
+        to Force Field Parameterization? Biophys J. 2011. 100. L47-L49. Error is estimated using the method of
+        Flyvbjerg, H., and Petersen, H. G. Error Estimates on Averages of Correlated Data. J Phys Chem. 1989. 91.
+        461-466. """
     side_length, n_alg1, n_alg2, cutoff = arguments
     time            = primary_data['*/time']
     com_dist        = primary_data['*/association_com']
@@ -58,7 +62,7 @@ def association_com(primary_data, arguments, n_cores):
     block_lengths, block_SEs    = _block(total_bound / n_alg1)
     min_asym, max_asym, poi, k, block_SEs_fit   = _fit_sigmoid(block_lengths, block_SEs)
     Ka_SE                       = _P_bound_SE_to_Ka_SE(P_bound[-1], C_alg1_total, C_alg2_total, max_asym)
-    print Ka[-1], Ka_SE
+#    print Ka[-1], Ka_SE
     formed                      = np.zeros(n_alg1)
     starts                      = [[] for i in range(n_alg1)]
     ends                        = [[] for i in range(n_alg2)]
@@ -84,7 +88,7 @@ def association_com(primary_data, arguments, n_cores):
     koff        = koff_sim /  C_alg1_total
     kon_SE      = kon  * (kon_sim_SE  / kon_sim)
     koff_SE     = koff * (koff_sim_SE / koff_sim)
-    print kon, kon_SE, koff, koff_SE, kon / koff
+#    print kon, kon_SE, koff, koff_SE, kon / koff
     return  [("/association_com/P_bound/Ka",                np.array([Ka[-1], Ka_SE])),
              ("/association_com/P_bound/Ka",                {'units': 'M-1'}),
              ("/association_com/P_bound/Ka_convergence",    Ka),

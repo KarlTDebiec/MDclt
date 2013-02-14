@@ -40,10 +40,10 @@ def _primary_pool_director(task):
     return function(arguments)
 def analyze_primary(hdf5_filename, path, segment_lister, analyses, n_cores = 1):
     """ Performs primary analysis (analysis of trajectory directly)
-        1) Checks data already present in <hdf5_file>
+        1) Checks data already present in <hdf5_filename>
         2) Builds list of trajectory segments at <path> using function <segment_lister>
-        3) Builds task list based on requested <analyses>, data present in <hdf5_file>, and segments at <path>
-        4) Distributes tasks across <n_cores> and writes results to <hdf5_file>"""
+        3) Builds task list based on requested <analyses>, data present in <hdf5_filename>, and segments at <path>
+        4) Distributes tasks across <n_cores> and writes results to <hdf5_filename> """
     sys.stderr.write("Analyzing trajectory at {0}.\n".format(path.replace('//','/')))
     for module_name in set([m.split('.')[0] for m in analyses.keys() + [segment_lister]]):  import_module(module_name)
     hierarchy       = get_hierarchy(hdf5_filename)
@@ -83,7 +83,7 @@ def analyze_secondary(hdf5_filename, analyses, n_cores = 1):
         1) Builds list of data required from <hdf5_filename> by <analyses>
         2) Loads required data from <hdf5_filename>
         3) Builds task list based on <analyses>
-        4) Completes tasks in serial using <n_cores> if implemented for that task and writes results to <hdf5_file>"""
+        4) Completes tasks in serial, using <n_cores> for each task if implemented, and saves results to <hdf5_file>"""
     sys.stderr.write("Analyzing file {0}.\n".format(hdf5_filename))
     for module_name in set([m.split('.')[0] for m in analyses.keys()]):  import_module(module_name)
     path_list       = _secondary_make_path_list(analyses)

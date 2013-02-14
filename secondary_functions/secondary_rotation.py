@@ -1,9 +1,9 @@
 #!/usr/bin/python
 
-desc = """rotation.py
+desc = """secondary_rotation.py
     Functions for secondary analysis of rotational motion
     Written by Karl Debiec on 13-02-08
-    Last updated 13-02-11"""
+    Last updated 13-02-13"""
 ########################################### MODULES, SETTINGS, AND DEFAULTS ############################################
 import os, sys
 import time as time_module
@@ -53,6 +53,12 @@ def shape_rotmat(shapes):           return np.array([np.sum(shapes[:, 0]), 3, 3]
 def process_rotmat(new_data):       return np.reshape(new_data, (new_data.shape[0], 3, 3))
 ################################################## ANALYSIS FUNCTIONS ##################################################
 def anisotropic(primary_data, arguments, n_cores = 1):
+    """ Calculates the rotational diffusion tensor of <domain> via the autocorrelation functions of <n_vectors> random
+        unit vectors as they are rotated by <rotmat>. The autocorrelation function is integrated to time cutoff(s)
+        <tau_finites> and tail corrected to obtain the local correlation time. From these correlation times the 3x3
+        rotational diffusion tensor is calculated using singular value decomposition. Input data may optionally be
+        reduced by <index_slice>. Follows the protocol of  Wong, V., and Case, D. A. J Phys Chem B. 2008. 112.
+        6013-6024. Error is estimated by repeating calculations for halves and quarters of the dataset. """
     domain      = arguments['domain']
     tau_finites = np.array(arguments['tau_finite']) if 'tau_finite'  in arguments else np.array([5])
     n_vectors   = arguments['n_vectors']            if 'n_vectors'   in arguments else 1000
@@ -88,7 +94,13 @@ def anisotropic(primary_data, arguments, n_cores = 1):
                 tau_ls[j]   = tau_l
             pool.close()
             pool.join()
-            d_locals_t  = np.transpose(np.mat(1 / (6 * tau_ls)))
+            """ Note: The presence of * 2 in the line below is not understood; omitting it yields results 1/2 of
+                those published by Wong and Case. The issue is likely at one of the following steps:
+                    d_local is half  what is should be
+                    tau_l   is twice what it should be
+                    F_l     is twice what it should be
+                    acf     is twice what it should be """
+            d_locals_t  = np.transpose(np.mat(1 / (6 * tau_ls))) * 2
             A           = _A(vectors)
             Q           = np.squeeze(np.array(np.mat(np.linalg.pinv(A)) * np.mat(d_locals_t)))
             D           =  _Q_1D_to_D_2D(Q)
@@ -106,9 +118,7 @@ def anisotropic(primary_data, arguments, n_cores = 1):
         new_data   += [("/rotation_" + domain + "/" + path + "/D", Ds),
                        ("/rotation_" + domain + "/" + path + "/D", {'units': 'ns-1',
                                                                     'time':  time.size * dt,})]
-
     print new_data
-    return False
     return new_data
 def path_anisotropic(arguments):
     return  [('*/time',                          (shape_default, process_default, postprocess_default)),
