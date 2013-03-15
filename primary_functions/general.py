@@ -10,74 +10,76 @@ import numpy as np
 import MDAnalysis as md
 import MDAnalysis.analysis.align as mdaa
 import scipy.spatial.distance as ssd
-from   trajectory_cython  import cy_contact, cy_distance_pbc
-from   standard_functions import is_num, contact_2D_to_1D_indexes
+import trajectory_cython
+from   cython_functions  import _cy_contact
+from   standard_functions import is_num, _contact_2D_to_1D_indexes
 ################################################## ANALYSIS FUNCTIONS ##################################################
-def com(arguments):
+def com(segment, **kwargs):
     """ Calculates center of mass of <name> with selection <group> from <topology> and <trajectory> for <segment> """
-    segment, name, group, topology, trajectory = arguments
-    trj         = md.Universe(topology, trajectory)
-    com         = np.zeros((len(trj.trajectory), 3), dtype = np.float)
-    trj_sel     = trj.selectAtoms(group)
+    domain      = kwargs.get("domain",      "")
+    selection   = kwargs.get("selection",   "protein")
+    trj         = md.Universe(segment.topology, segment.trajectory)
+    com         = np.zeros((len(trj.trajectory), 3))
+    trj_sel     = trj.selectAtoms(selection)
     n_atoms     = trj_sel.numberOfAtoms()
-    for frame_i, frame in enumerate(trj.trajectory):
-        com[frame_i]    = trj_sel.centerOfMass()
-    return  [("/" + segment + "/com_" + name, com),
-             ("/" + segment + "/com_" + name, {'group': group, 'units': "A"})]
-def check_com(hierarchy, segment, arguments):
-    segment, path, topology, trajectory = segment
-    task_list   = []
-    for name, group in arguments:
-        if not segment + "/com_" + name in hierarchy:
-            task_list  += [(com, (segment, name, group, topology, trajectory))]
-    if task_list != []: return task_list
-    else:               return False
+    for i, frame in enumerate(trj.trajectory):
+        com[i]  = trj_sel.centerOfMass()
+    return  [("/" + segment + "/com_" + domain, com),
+             ("/" + segment + "/com_" + domain, {'selection': selection, 'units': "A"})]
+def _check_com(hdf5_file, segment, **kwargs):
+    domain  = kwargs.get("domain",    "")
+    if not (segment + "/com_" + domain in hdf5_file):
+            return [(com, segment, kwargs)]
+    else:   return False
 
-def rmsd(arguments):
-    """ Calculates rmsd of <name> relative to <reference> with <fit> from <topology> and trajectory> for <segment> """
-    segment, name, fit, reference, topology, trajectory = arguments
+
+def rmsd(segment, **kwargs):
+    """ Calculates rmsd of <domain> relative to <reference> with <selection> """
+    domain      = kwargs.get("domain",    "")
+    selection   = kwargs.get("selection", "protein and name CA")
+    reference   = kwargs.get("reference")
     ref         = md.Universe(reference)
-    trj         = md.Universe(topology, trajectory)
-    rmsd        = np.zeros((len(trj.trajectory)),       dtype = np.float)
-    rotmat      = np.zeros((len(trj.trajectory), 9),    dtype = np.float)
-    ref_sel     = ref.selectAtoms(fit)
-    trj_sel     = trj.selectAtoms(fit)
+    trj         = md.Universe(segment.topology, segment.trajectory)
+    rmsd        = np.zeros(len(trj.trajectory))
+    rotmat      = np.zeros((len(trj.trajectory), 9))
+    ref_sel     = ref.selectAtoms(selection)
+    trj_sel     = trj.selectAtoms(selection)
     n_atoms     = trj_sel.numberOfAtoms()
     ref_frame   = (ref_sel.coordinates() - ref_sel.centerOfMass()).T.astype('float64')
-    for frame_i, frame in enumerate(trj.trajectory):
-        trj_frame       = (trj_sel.coordinates() - trj_sel.centerOfMass()).T.astype('float64')
-        rmsd[frame_i]   = mdaa.qcp.CalcRMSDRotationalMatrix(ref_frame, trj_frame, n_atoms, rotmat[frame_i], None)
-    return  [("/" + segment + "/rmsd_"   + name,    rmsd),
-             ("/" + segment + "/rotmat_" + name,    rotmat),
-             ("/" + segment + "/rmsd_"   + name,    {'fit': fit,    'units': "A"}),
-             ("/" + segment + "/rotmat_" + name,    {'fit': fit})]
-def check_rmsd(hierarchy, segment, arguments):
-    segment, path, topology, trajectory = segment
-    task_list   = []
-    for name, fit, reference in arguments:
-        if not (set([segment + "/rmsd_" + name, segment + "/rotmat_" + name]).issubset(hierarchy)):
-            task_list  += [(rmsd, (segment, name, fit, reference, topology, trajectory))]
-    if task_list != []: return task_list
-    else:               return False
+    for i, frame in enumerate(trj.trajectory):
+        trj_frame   = (trj_sel.coordinates() - trj_sel.centerOfMass()).T.astype('float64')
+        rmsd[i]     = mdaa.qcp.CalcRMSDRotationalMatrix(ref_frame, trj_frame, n_atoms, rotmat[i], None)
+    return  [("/" + segment + "/rmsd_"   + domain,  rmsd),
+             ("/" + segment + "/rotmat_" + domain,  rotmat),
+             ("/" + segment + "/rmsd_"   + domain,  {'selection': selection,    'units': "A"}),
+             ("/" + segment + "/rotmat_" + domain,  {'selection': selection})]
+def _check_rmsd(hdf5_file, segment, **kwargs):
+    domain  = kwargs.get("domain",    "")
+    if not ([segment + "/rmsd_"   + domain,
+             segment + "/rotmat_" + domain] in hdf5_file):
+            return [(rmsd, segment, kwargs)]
+    else:   return False
 
-def contact(arguments):
+
+def contact(segment, **kwargs):
     """ Calculates inter-residue contacts from <topology> and <trajectory> for <segment>
         Contact defined as heavy-atom minimum distance within 5.5 Angstrom """
-    segment, topology, trajectory = arguments
-    trj         = md.Universe(topology, trajectory)
-    trj_sel     = trj.selectAtoms("(protein or resname ACE) and (name C* or name N* or name O* or name S*)")
-    n_res       = len(trj_sel.residues)
-    atomcounts  = np.array([len(R.selectAtoms("(name C* or name N* or name O* or name S*)")) for R in trj_sel.residues])
-    atomcounts  = np.array([(np.sum(atomcounts[:i]), np.sum(atomcounts[:i]) + n) for i, n in enumerate(atomcounts)])
-    contacts    = np.zeros((len(trj.trajectory), (n_res**2-n_res)/2), dtype = np.int8)
-    indexes     = contact_2D_to_1D_indexes(n_res)
+    res_selection   = kwargs.get("res_selection",  "(protein or resname ACE)")
+    atom_selection  = kwargs.get("atom_selection", "(name C* or name N* or name O* or name S*)")
+    trj             = md.Universe(segment.topology, segment.trajectory)
+    trj_sel         = trj.selectAtoms(res_selection + " and " + atom_selection)
+    n_res           = len(trj_sel.residues)
+    atomcounts      = np.array([len(R.selectAtoms(atom_selection)) for R in trj_sel.residues])
+    atomcounts      = np.array([(np.sum(atomcounts[:i]), np.sum(atomcounts[:i]) + n) for i, n in enumerate(atomcounts)])
+    contacts        = np.zeros((len(trj.trajectory), (n_res ** 2 - n_res) / 2), dtype = np.int8)
+    indexes         = _contact_2D_to_1D_indexes(n_res)
     for frame_i, frame in enumerate(trj.trajectory):
-        contacts[frame_i]   = cy_contact(trj_sel.coordinates().T.astype('float64'), atomcounts, indexes)
+        contacts[frame_i]   = _cy_contact(trj_sel.coordinates().T.astype('float64'), atomcounts, indexes)
     return  [("/" + segment + "/contact",  contacts)]
-def check_contact(hierarchy, segment, arguments):
-    segment, path, topology, trajectory = segment
-    if not segment + "/contact" in hierarchy:   return [(contact, (segment, topology, trajectory))]
-    else:                                       return False
+def _check_contact(hdf5_file, segment, **kwargs):
+    if not (segment + "/contact" in hdf5_file):
+            return [(contact, segment, kwargs)]
+    else:   return False
 
 #def mindist(arguments):
 #    segment, topology, trajectory, name, group_1, group_2 = arguments

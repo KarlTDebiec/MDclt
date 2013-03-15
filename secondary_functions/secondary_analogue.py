@@ -36,19 +36,22 @@ def _fit_sigmoid(x, y):
     y_fit                       = max_asym + (min_asym - max_asym) / (1 + (x / poi) ** k)
     return min_asym, max_asym, poi, k, y_fit
 ################################################ PRIMARY DATA FUNCTIONS ################################################
-def shape_association(shapes):      return np.array([np.sum(shapes, axis = 0)[0], shapes[0,1]])
-def process_association(new_data):  return np.min(new_data, axis = 2)
+def _shape_association(shapes):     return np.array([np.sum(shapes, axis = 0)[0], shapes[0,1]])
+def _process_association(new_data): return np.min(new_data, axis = 2)
 ################################################## ANALYSIS FUNCTIONS ##################################################
-def association_com(primary_data, arguments, n_cores):
+def association_com(hdf5_file, n_cores = 1, **kwargs):
     """ Calculates Ka, kon, and koff of <n_alg1> molecules of type 1 and <n_alg2> molecules of type 2 in cubic box of
         <side length> with the bound state defined as center of mass distance below <cutoff> Angstrom. Follows the
         protocol of Piana, S., Lindorff-Larsen, K., Shaw, D.E. How Robust Are Protein Folding Simulations with Respect
         to Force Field Parameterization? Biophys J. 2011. 100. L47-L49. Error is estimated using the method of
         Flyvbjerg, H., and Petersen, H. G. Error Estimates on Averages of Correlated Data. J Phys Chem. 1989. 91.
         461-466. """
-    side_length, n_alg1, n_alg2, cutoff = arguments
-    time            = primary_data['*/time']
-    com_dist        = primary_data['*/association_com']
+    side_length     = kwargs.get("side_length")
+    n_alg1          = kwargs.get("n_alg1",      1
+    n_alf2          = kwargs.get("n_alg2"       2)
+    cutoff          = kwargs.get("cutoff",      4.5)
+    time            = hdf5_file.data['*/time']
+    com_dist        = hdf5_file.data['*/association_com']
     C_alg1_total    = _concentration(side_length, n_alg1)
     C_alg2_total    = _concentration(side_length, n_alg2)
     bound                       = np.zeros(com_dist.shape)
@@ -110,9 +113,8 @@ def association_com(primary_data, arguments, n_cores):
              ("/association_com/fpt/fpt_off",               fpt_off),
              ("/association_com/fpt/fpt_off",               {'units': 'ns'}),
              ("/association_com/fpt",                       {'time': time[-1]})]
-def path_association_com(arguments):
-    return [('*/time',              (shape_default,     process_default,     postprocess_default)),
-            ('*/association_com',   (shape_association, process_association, postprocess_default))]
-def check_association_com(arguments):
-    return [(association_com, arguments)]
+def _check_association_com(hdf5_file, **kwargs):
+    hdf5_file.load("*/time")
+    hdf5_file.load("*/association_com", shaper = _shape_association,  processor = _process_association)
+    return [(association_com, kwargs)]
 

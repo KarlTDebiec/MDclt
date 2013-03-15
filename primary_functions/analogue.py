@@ -3,35 +3,33 @@
 desc = """analogue.py
     Functions for analysis of amino acid analogue trajectories
     Written by Karl Debiec on 12-11-30
-    Last updated 13-02-04"""
+    Last updated 13-03-06"""
 ########################################### MODULES, SETTINGS, AND DEFAULTS ############################################
 import os, sys
 import numpy as np
 import MDAnalysis as md
-from   trajectory_cython import cy_distance_pbc
+from   cython_functions import _cy_distance_pbc
 ################################################## ANALYSIS FUNCTIONS ##################################################
 def com(arguments):
     """ Calculates center of mass distance between two residue types; assumes cubic box and pbc """
-    segment, topology, trajectory, alg1, alg2 = arguments
-    trj         = md.Universe(topology, trajectory)
+    alg1        = kwargs.get("alg1")
+    alg2        = kwargs.get("alg1") 
+    trj         = md.Universe(segment.topology, segment.trajectory)
     alg1s       = [r.atoms for r in trj.residues if r.name == alg1]
     alg2s       = [r.atoms for r in trj.residues if r.name == alg2]
     alg1s_com   = np.zeros((len(alg1s), 3))
     alg2s_com   = np.zeros((len(alg2s), 3))
     distances   = np.zeros((len(trj.trajectory), len(alg1s), len(alg2s)))
-    for frame_i, frame in enumerate(trj.trajectory):
-        for alg1_i, alg1 in enumerate(alg1s):  alg1s_com[alg1_i] = np.array(alg1.centerOfMass(), dtype = np.float64)
-        for alg2_i, alg2 in enumerate(alg2s):  alg2s_com[alg2_i] = np.array(alg2.centerOfMass(), dtype = np.float64)
-        distances[frame_i]  = cy_distance_pbc(alg1s_com, alg2s_com, float(frame.dimensions[0]))
+    for i, frame in enumerate(trj.trajectory):
+        for j, alg1 in enumerate(alg1s):  alg1s_com[j] = np.array(alg1.centerOfMass(), dtype = np.float64)
+        for j, alg2 in enumerate(alg2s):  alg2s_com[j] = np.array(alg2.centerOfMass(), dtype = np.float64)
+        distances[i]  = _cy_distance_pbc(alg1s_com, alg2s_com, float(frame.dimensions[0]))
     return  [("/" + segment + "/association_com",   distances),
              ("/" + segment + "/association_com",   {'units': "A"})]
-def check_com(hierarchy, segment, arguments):
-    segment, path, topology, trajectory = segment
-    alg1, alg2                          = arguments
-    if not os.path.isfile(topology):    return False
-    if not os.path.isfile(trajectory):  return False
-    if not segment + "/association_com" in hierarchy:   return [(com, (segment, topology, trajectory, alg1, alg2))]
-    else:                                               return False
+def _check_com(hdf5_file, segment, **kwargs):
+    if not (segment + "/association_com" in hdf5_file):
+            return [(com, segment, kwargs)]
+    else:   return False
 
 #def salt_bridge(arguments):
 #    """ salt bridge analysis, assumes cubic box and pbc """
