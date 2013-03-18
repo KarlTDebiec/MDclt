@@ -3,7 +3,7 @@
 desc = """gromacs.py
     Functions for primary analysis of GROMACS trajectories
     Written by Karl Debiec on 12-11-30
-    Last updated 13-03-14"""
+    Last updated 13-03-17"""
 ########################################### MODULES, SETTINGS, AND DEFAULTS ############################################
 import commands, os, sys
 import numpy as np
@@ -12,9 +12,10 @@ from   standard_functions import is_num, month
 def energy(segment, **kwargs):
     """ parses <log>  of <logtype> for <segment> """
     log                 = segment.file_of_type(".log")
-    logtype             = kwargs.get("logtype", "standard")
-    nsteps              = float(commands.getoutput("grep nsteps    " + log).split()[2])
-    nstlog              = float(commands.getoutput("grep nstlog    " + log).split()[2])
+    logtype             = kwargs.get("logtype",    "standard")
+    start_time          = kwargs.get("start_time", 0.0)
+    nsteps              = float(commands.getoutput("grep nsteps " + log).split()[2])
+    nstlog              = float(commands.getoutput("grep nstlog " + log).split()[2])
     length              = nsteps / nstlog
     with open(log, "r") as log:
         raw             = [line.rstrip() for line in log.readlines()]
@@ -50,9 +51,9 @@ def energy(segment, **kwargs):
                     kinetic_energy[i]       = float(line[1])
                     total_energy[i]         = float(line[2])
                     temperature[i]          = float(line[3])
-                elif line.startswith(" Pressure (bar)   Constr. rmsd"):
+                elif line.startswith(" Pressure (bar)"):
                     line                    = raw[j + 1].split()
-                    pressure[i]             = float(line[1])
+                    pressure[i]             = float(line[0])
                     i                      += 1
             elif (logtype == "charmm"):
                 if   line.startswith("   Coul. recip.      Potential    Kinetic En.   Total Energy    Temperature"):
@@ -65,7 +66,7 @@ def energy(segment, **kwargs):
                     line                    = raw[j + 1].split()
                     pressure[i]             = float(line[1])
                     i                      += 1
-    return [("/" + segment + "/time",               time),
+    return [("/" + segment + "/time",               time             + start_time),
             ("/" + segment + "/energy_total",       total_energy     * 0.239005736),
             ("/" + segment + "/energy_potential",   potential_energy * 0.239005736),
             ("/" + segment + "/energy_kinetic",     kinetic_energy   * 0.239005736),
@@ -85,6 +86,7 @@ def _check_energy(hdf5_file, segment, **kwargs):
              segment + "/energy_kinetic",
              segment + "/temperature",
              segment + "/pressure"] in hdf5_file):
+            kwargs["start_time"] = float(segment)
             return [(energy, segment, kwargs)]
     else:   return False
 
