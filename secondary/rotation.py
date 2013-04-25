@@ -3,7 +3,7 @@
 desc = """secondary_rotation.py
     Functions for secondary analysis of rotational motion
     Written by Karl Debiec on 13-02-08
-    Last updated 13-03-14"""
+    Last updated 13-04-24"""
 ########################################### MODULES, SETTINGS, AND DEFAULTS ############################################
 import os, sys
 import time as time_module
@@ -54,21 +54,25 @@ def diffusion_tensor(hdf5_file, n_cores = 1, **kwargs):
     n_vectors   = kwargs.get("n_vectors",   1000)
     index_slice = kwargs.get("index_slice", 1)
     convergence = kwargs.get("convergence", False)
+    verbose     = kwargs.get("verbose",     False)
     time_full   = hdf5_file.data['*/time'][::index_slice]
     rotmat_full = hdf5_file.data['*/rotmat_' + output_path][::index_slice]
     vectors     = _random_unit_vectors(n_vectors)
     size        = time_full.size
     dt          = time_full[1] - time_full[0]
 
-    expected    = {"ubiquitin": [0.041, 0.046, 0.051, 0.046, 1.180, 1.080],
+    pub         = {"binase":    [1.000, 1.000, 1.000, 0.034, 1.470, 0.640],
+                   "ubiquitin": [0.041, 0.046, 0.051, 0.046, 1.180, 1.080],
                    "GB3":       [0.050, 0.060, 0.100, 0.070, 1.810, 0.330],
                    "lysozyme":  [0.025, 0.033, 0.038, 0.032, 1.310, 1.240]}[output_path]
 
     if index_slice != 1:
         output_path    += "/slice_{0}/".format(index_slice)
     new_data    = [("/rotation_" + output_path + "/tau_finite", tau_finites),
-                   ("/rotation_" + output_path + "/tau_finite", {'units': 'ns'}),
-                   ("/rotation_" + output_path,                 {'n_vectors': n_vectors, 'dt': dt})]
+                   ("/rotation_" + output_path + "/tau_finite", {"units": "ns"}),
+                   ("/rotation_" + output_path,                 {"n_vectors": n_vectors,
+                                                                 "dt":        dt,
+                                                                 "time":      time_full[-1]})]
     if convergence:
         splits  = [("full",      "[:]"),               ("half/1",    "[:size/2]"),       ("half/2",    "[size/2:]"),
                    ("quarter/1", "[:size/4]"),         ("quarter/2", "[size/4:size/2]"),
@@ -78,7 +82,7 @@ def diffusion_tensor(hdf5_file, n_cores = 1, **kwargs):
     for path, index in splits:
         time    = eval("time_full{0}".format(index))
         rotmat  = eval("rotmat_full{0}".format(index))
-        Ds      = np.zeros((tau_finites.size, 3, 3))
+        Ds      = np.zeros((tau_finites.size, 3))
 
         for i, tau_finite in enumerate(tau_finites):
             tau_ls      = np.zeros(n_vectors)
@@ -102,23 +106,67 @@ def diffusion_tensor(hdf5_file, n_cores = 1, **kwargs):
             D_average   = (Dx + Dy + Dz)    / 3
             anisotropy  = (2 * Dz)          / (Dx + Dy)
             rhombicity  = (1.5 * (Dy - Dx)) / (Dz - 0.5 * (Dx + Dy))
-            print "           {0:<5} {1:<5} {2:<2}".format("Pub.", "Calc.", "%")
-            print "Dx         {0:6.4f} {1:6.4f} {2:3.0f}".format(expected[0],Dx,        100 * Dx         / expected[0])
-            print "Dy         {0:6.4f} {1:6.4f} {2:3.0f}".format(expected[1],Dy,        100 * Dy         / expected[1])
-            print "Dz         {0:6.4f} {1:6.4f} {2:3.0f}".format(expected[2],Dz,        100 * Dz         / expected[2])
-            print "D_AVERAGE  {0:6.4f} {1:6.4f} {2:3.0f}".format(expected[3],D_average, 100 * D_average  / expected[3])
-            print "ANISOTROPY {0:6.4f} {1:6.4f} {2:3.0f}".format(expected[4],anisotropy,100 * anisotropy / expected[4])
-            print "RHOMBICITY {0:6.4f} {1:6.4f} {2:3.0f}".format(expected[5],rhombicity,100 * rhombicity / expected[5])
-            print
+            Ds[i]       = [Dx, Dy, Dz]
+
+            if verbose:
+                print "DURATION   {0} ns".format(int(time.size * dt))
+                print "           {0:<5} {1:<5} {2:<2}".format("Pub.", "Calc.", "%")
+                print "Dx         {0:6.4f} {1:6.4f} {2:3.0f}".format(pub[0],Dx,        100 * Dx         / pub[0])
+                print "Dy         {0:6.4f} {1:6.4f} {2:3.0f}".format(pub[1],Dy,        100 * Dy         / pub[1])
+                print "Dz         {0:6.4f} {1:6.4f} {2:3.0f}".format(pub[2],Dz,        100 * Dz         / pub[2])
+                print "D_AVERAGE  {0:6.4f} {1:6.4f} {2:3.0f}".format(pub[3],D_average, 100 * D_average  / pub[3])
+                print "ANISOTROPY {0:6.4f} {1:6.4f} {2:3.0f}".format(pub[4],anisotropy,100 * anisotropy / pub[4])
+                print "RHOMBICITY {0:6.4f} {1:6.4f} {2:3.0f}".format(pub[5],rhombicity,100 * rhombicity / pub[5])
         new_data   += [("/rotation_" + output_path + "/" + path + "/D", Ds),
-                       ("/rotation_" + output_path + "/" + path + "/D", {'units': 'ns-1',
-                                                                         'time':  time.size * dt,})]
-    return None
+                       ("/rotation_" + output_path + "/" + path + "/D", {"units": "ns-1",
+                                                                         "time":  time.size * dt,})]
     return new_data
 def _check_diffusion_tensor(hdf5_file, **kwargs):
-    domain  = kwargs.get("domain",    "")
+    domain      = kwargs.get("domain",    "")
+    output_path = domain
+    tau_finites = kwargs.get("tau_finite",  np.array([1.0]))
+    n_vectors   = kwargs.get("n_vectors",   1000)
+    index_slice = kwargs.get("index_slice", 1)
+    convergence = kwargs.get("convergence", False)
+    force       = kwargs.get("force",       False)
+    verbose     = kwargs.get("verbose",     False)
+
+    if index_slice != 1: output_path += "/slice_{0}/".format(index_slice)
+    if convergence:      paths        = ["full","half/1","half/2","quarter/1","quarter/2","quarter/3","quarter/4"]
+    else:                paths        = ["full"]
+    expected    = ["/rotation_" + output_path + "/tau_finite"] 
+    expected   += ["/rotation_" + output_path + "/" + path + "/D" for path in paths]
+
     hdf5_file.load("*/time")
-    hdf5_file.load("*/rotmat_" + domain, shaper = _shape_rotmat,  processor = _process_rotmat)
-    return [(diffusion_tensor, kwargs)]
+    hdf5_file.load("*/rotmat_" + domain, shaper = _shape_rotmat, processor = _process_rotmat)
 
+    if (force
+    or not(expected in hdf5_file)):
+        return [(diffusion_tensor, kwargs)]
 
+    attrs       = hdf5_file.attrs("/rotation_" + output_path)
+
+    if (n_vectors                                         != attrs["n_vectors"]
+    or  hdf5_file.data["*/time"][::index_slice][-1]       != attrs["time"]
+    or  hdf5_file["/rotation_"+output_path+"/tau_finite"] != tau_finites):
+        return [(diffusion_tensor, kwargs)]
+    elif verbose:
+        pub = {"binase":    [1.000, 1.000, 1.000, 0.034, 1.470, 0.640],
+               "ubiquitin": [0.041, 0.046, 0.051, 0.046, 1.180, 1.080],
+               "GB3":       [0.050, 0.060, 0.100, 0.070, 1.810, 0.330],
+               "lysozyme":  [0.025, 0.033, 0.038, 0.032, 1.310, 1.240]}[domain]
+        for path in expected[1:]:
+            time        = hdf5_file.attrs(path)["time"]
+            Dx, Dy, Dz  = np.squeeze(hdf5_file[path])
+            D_average   = (Dx + Dy + Dz)    / 3
+            anisotropy  = (2 * Dz)          / (Dx + Dy)
+            rhombicity  = (1.5 * (Dy - Dx)) / (Dz - 0.5 * (Dx + Dy))
+            print "DURATION   {0} ns".format(int(time))
+            print "           {0:<5} {1:<5} {2:<2}".format("Pub.", "Calc.", "%")
+            print "Dx         {0:6.4f} {1:6.4f} {2:3.0f}".format(pub[0],Dx,        100 * Dx         / pub[0])
+            print "Dy         {0:6.4f} {1:6.4f} {2:3.0f}".format(pub[1],Dy,        100 * Dy         / pub[1])
+            print "Dz         {0:6.4f} {1:6.4f} {2:3.0f}".format(pub[2],Dz,        100 * Dz         / pub[2])
+            print "D_AVERAGE  {0:6.4f} {1:6.4f} {2:3.0f}".format(pub[3],D_average, 100 * D_average  / pub[3])
+            print "ANISOTROPY {0:6.4f} {1:6.4f} {2:3.0f}".format(pub[4],anisotropy,100 * anisotropy / pub[4])
+            print "RHOMBICITY {0:6.4f} {1:6.4f} {2:3.0f}".format(pub[5],rhombicity,100 * rhombicity / pub[5])
+    return False
