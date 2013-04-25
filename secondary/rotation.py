@@ -61,7 +61,7 @@ def diffusion_tensor(hdf5_file, n_cores = 1, **kwargs):
     size        = time_full.size
     dt          = time_full[1] - time_full[0]
 
-    pub         = {"binase":    [1.000, 1.000, 1.000, 0.034, 1.470, 0.640],
+    pub         = {"binase":    [0.026, 0.032, 0.043, 0.034, 1.470, 0.640],
                    "ubiquitin": [0.041, 0.046, 0.051, 0.046, 1.180, 1.080],
                    "GB3":       [0.050, 0.060, 0.100, 0.070, 1.810, 0.330],
                    "lysozyme":  [0.025, 0.033, 0.038, 0.032, 1.310, 1.240]}[output_path]
@@ -110,7 +110,7 @@ def diffusion_tensor(hdf5_file, n_cores = 1, **kwargs):
 
             if verbose:
                 print "DURATION   {0} ns".format(int(time.size * dt))
-                print "           {0:<5} {1:<5} {2:<2}".format("Pub.", "Calc.", "%")
+                print "           Pub.   Calc.  %"
                 print "Dx         {0:6.4f} {1:6.4f} {2:3.0f}".format(pub[0],Dx,        100 * Dx         / pub[0])
                 print "Dy         {0:6.4f} {1:6.4f} {2:3.0f}".format(pub[1],Dy,        100 * Dy         / pub[1])
                 print "Dz         {0:6.4f} {1:6.4f} {2:3.0f}".format(pub[2],Dz,        100 * Dz         / pub[2])
@@ -151,7 +151,7 @@ def _check_diffusion_tensor(hdf5_file, **kwargs):
     or  hdf5_file["/rotation_"+output_path+"/tau_finite"] != tau_finites):
         return [(diffusion_tensor, kwargs)]
     elif verbose:
-        pub = {"binase":    [1.000, 1.000, 1.000, 0.034, 1.470, 0.640],
+        pub = {"binase":    [0.026, 0.032, 0.043, 0.034, 1.470, 0.640],
                "ubiquitin": [0.041, 0.046, 0.051, 0.046, 1.180, 1.080],
                "GB3":       [0.050, 0.060, 0.100, 0.070, 1.810, 0.330],
                "lysozyme":  [0.025, 0.033, 0.038, 0.032, 1.310, 1.240]}[domain]
@@ -162,7 +162,7 @@ def _check_diffusion_tensor(hdf5_file, **kwargs):
             anisotropy  = (2 * Dz)          / (Dx + Dy)
             rhombicity  = (1.5 * (Dy - Dx)) / (Dz - 0.5 * (Dx + Dy))
             print "DURATION   {0} ns".format(int(time))
-            print "           {0:<5} {1:<5} {2:<2}".format("Pub.", "Calc.", "%")
+            print "           Pub.   Calc.  %"
             print "Dx         {0:6.4f} {1:6.4f} {2:3.0f}".format(pub[0],Dx,        100 * Dx         / pub[0])
             print "Dy         {0:6.4f} {1:6.4f} {2:3.0f}".format(pub[1],Dy,        100 * Dy         / pub[1])
             print "Dz         {0:6.4f} {1:6.4f} {2:3.0f}".format(pub[2],Dz,        100 * Dz         / pub[2])
