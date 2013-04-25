@@ -4,17 +4,18 @@ Molecular Dynamics Analysis Toolkit README
     karl.t.debiec@gmail.com
 
 
-The Molecular Dynamics Analysis Toolkit is a set of functions intended to simplify analysis of molecular dynamics
-trajectories. MDAT aims to automate (i.e. hide) tedious steps of analysis such as looping over multiple files, storing
-the results in a database, and splitting calculation across multiple cores. MDAT makes use of external libraries
-including h5py, MDAnalysis, and Cython; use of the Enthought Python Distribution is recommended. Analyses are split
-into primary (of trajectories and associated logs) and secondary (of primary analyses). The corresponding functions
-are analyze_primary and analyze_secondary, and they are probably best explained by example:
+This toolkit is a set of functions intended to simplify analysis of molecular dynamics trajectories.
+MDAT aims to automate (i.e. hide) tedious steps of analysis such as looping over multiple files, storing
+the results in a database, and splitting calculation across multiple cores.
+MDAT makes use of external libraries including h5py, MDAnalysis, and Cython; use of the Enthought Python Distribution is recommended.
+Analyses are classified as either primary (of trajectories and associated logs) and secondary (of primary analyses).
+The corresponding functions are analyze_primary and analyze_secondary, and are probably best explained by example scripts:
 
     from analysis_toolkit import analyze_primary
 
     analyze_primary(
         n_cores         = 8,
+<<<<<<< HEAD
         hdf5_filename   = "/home/ubiquitin.hdf5",
         path            = "/home/13-01_01_ubiquitin",
         segment_lister  = "standard_functions.segments_standard",
@@ -22,18 +23,35 @@ are analyze_primary and analyze_secondary, and they are probably best explained 
                            ("general.rmsd",   {"domain":      "ubiquitin",
                                                "selection":   "protein and name CA and resid 3:71",
                                                "reference":   "/home/ubiquitin.pdb"})])
+=======
+        hdf5_filename   = "ubiquitin.hdf5",
+        path            = "/home/13-01_01_ubiquitin_AMBER99SB_SPCE",
+        segment_lister  = "standard_functions.segments_standard",
+        analyses        = [("amber.energy", {"time_offset": -1.3}),
+                           ("general.rmsd", {"domain":      "ubiquitin",
+                                             "selection":   "protein and name CA and resid 3:71",
+                                             "reference":   "/home/1UBQ.pdb"})])
+>>>>>>> e8b0dca018b34d409852eecbba60c0199ce019ce
 
 This function call will look at the the trajectory at "/home/13-01_01_ubiquitin" and use the function
 "standard_functions.segments_standard" to list the trajectory segments present. It will conduct two analyses, the
 function "energy" in the module "amber" and the function "rmsd" in the module "general". The first function parses
+<<<<<<< HEAD
 Amber's energy log, while the second calculates the RMSD relative to a template. It will first check 
 "/home/ubiqutin.hdf5" to see what analyses have been previously completed, and generate a task list for those that
 remain. Those tasks will be split across 8 cores, and the results stored in "/home/ubiquitin.hdf5"
+=======
+Amber's energy log, while the second calculates the RMSD relative to a template. Options for each analysis are set using
+a dictionary of keyword arguments. The program  will first check "ubiqutin.hdf5" to see what analyses have been
+previously completed, and generate a task list for those that have not. Those tasks will be split across 8 cores, and
+the results stored in "ubiquitin.hdf5".
+>>>>>>> e8b0dca018b34d409852eecbba60c0199ce019ce
 
     from analysis_toolkit import analyze_secondary
 
     analyze_secondary(
         n_cores         = 8,
+<<<<<<< HEAD
         hdf5_filename   = "/home/ubiquitin.hdf5",
         analyses        = [("rotation.diffusion_tensor",    {"domain":      "ubiquitin",
                                                              "n_vectors":   1000,
@@ -46,4 +64,18 @@ passed to the function, and the results stored in "/home/ubiqutin.hdf5"
 
 The program presently requires data to be organized as <SEGMENT_#>/<SEGMENT_#>.*, thought this is intended to be
 easily modified by writing an alternative segment_lister function.
+=======
+        hdf5_filename   = "ubiquitin.hdf5",
+        analyses        = [("rotation.diffusion_tensor",  {"domain":      "ubiquitin",
+                                                           "n_vectors":   1000,
+                                                           "index_slice": 2,
+                                                           "tau_finite":  np.arange(1, 11, 1)})])
+
+This function call with apply the secondary analysis function "diffusion_tensor" from the module "rotation" to the
+primary data stored in "ubiquitin.hdf5". Options for analysis are again set using a dictionary of keyword arguments,
+and the results stored in "ubiqutin.hdf5"
+
+The program presently requires trajectories to be organized as <SEGMENT_#>/<SEGMENT_#>.*, thought this is intended to be
+easily modified by writing a segment_lister.
+>>>>>>> e8b0dca018b34d409852eecbba60c0199ce019ce
 
