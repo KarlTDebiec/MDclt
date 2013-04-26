@@ -115,8 +115,8 @@ def rotation(hdf5_file, n_cores = 1, **kwargs):
                 else:
                     print "           Pub.   Calc.  %"
                     print "Dx         {0:6.4f} {1:6.4f} {2:3.0f}".format(control[0],Ds[i,0],    100 * Ds[i,0]    / control[0])
-                    print "Dy         {0:6.4f} {1:6.4f} {2:3.0f}".format(control[1],Ds[i,0],    100 * Ds[i,1]    / control[1])
-                    print "Dz         {0:6.4f} {1:6.4f} {2:3.0f}".format(control[2],Ds[i,0],    100 * Ds[i,2]    / control[2])
+                    print "Dy         {0:6.4f} {1:6.4f} {2:3.0f}".format(control[1],Ds[i,1],    100 * Ds[i,1]    / control[1])
+                    print "Dz         {0:6.4f} {1:6.4f} {2:3.0f}".format(control[2],Ds[i,2],    100 * Ds[i,2]    / control[2])
                     print "D_AVERAGE  {0:6.4f} {1:6.4f} {2:3.0f}".format(control[3],D_average,  100 * D_average  / control[3])
                     print "ANISOTROPY {0:6.4f} {1:6.4f} {2:3.0f}".format(control[4],anisotropy, 100 * anisotropy / control[4])
                     print "RHOMBICITY {0:6.4f} {1:6.4f} {2:3.0f}".format(control[5],rhombicity, 100 * rhombicity / control[5])
@@ -175,8 +175,8 @@ def _check_rotation(hdf5_file, **kwargs):
                 else:
                     print "           Pub.   Calc.  %"
                     print "Dx         {0:6.4f} {1:6.4f} {2:3.0f}".format(control[0],Ds[i,0],    100 * Ds[i,0]    / control[0])
-                    print "Dy         {0:6.4f} {1:6.4f} {2:3.0f}".format(control[1],Ds[i,0],    100 * Ds[i,1]    / control[1])
-                    print "Dz         {0:6.4f} {1:6.4f} {2:3.0f}".format(control[2],Ds[i,0],    100 * Ds[i,2]    / control[2])
+                    print "Dy         {0:6.4f} {1:6.4f} {2:3.0f}".format(control[1],Ds[i,1],    100 * Ds[i,1]    / control[1])
+                    print "Dz         {0:6.4f} {1:6.4f} {2:3.0f}".format(control[2],Ds[i,2],    100 * Ds[i,2]    / control[2])
                     print "D_AVERAGE  {0:6.4f} {1:6.4f} {2:3.0f}".format(control[3],D_average,  100 * D_average  / control[3])
                     print "ANISOTROPY {0:6.4f} {1:6.4f} {2:3.0f}".format(control[4],anisotropy, 100 * anisotropy / control[4])
                     print "RHOMBICITY {0:6.4f} {1:6.4f} {2:3.0f}".format(control[5],rhombicity, 100 * rhombicity / control[5])
