@@ -33,7 +33,7 @@ class HDF5_File:
         if path in self:
             return np.array(self.hierarchy[path][...])
         else:
-            raise Exception("Inappropriate input to Peaklist.__getitem__(path):", path)
+            raise Exception("Inappropriate input to HDF5_File.__getitem__(path):", path)
     def _hierarchy(self):
         hierarchy = {}
         def get_hierarchy(x, y): hierarchy[x] = y

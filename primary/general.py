@@ -3,7 +3,7 @@
 desc = """general.py
     Functions for primary analysis of molecular dynamics trajectories
     Written by Karl Debiec on 12-11-30
-    Last updated 13-02-08"""
+    Last updated 13-04-25"""
 ########################################### MODULES, SETTINGS, AND DEFAULTS ############################################
 import os, sys
 import numpy as np
@@ -11,11 +11,11 @@ import MDAnalysis as md
 import MDAnalysis.analysis.align as mdaa
 import scipy.spatial.distance as ssd
 import trajectory_cython
-from   cython_functions  import _cy_contact
+from   cython_functions   import _cy_contact
 from   standard_functions import is_num, _contact_2D_to_1D_indexes
 ################################################## ANALYSIS FUNCTIONS ##################################################
 def com(segment, **kwargs):
-    """ Calculates center of mass of <name> with selection <group> from <topology> and <trajectory> for <segment> """
+    """ Calculates center of mass of <domain> with selection <group> from <topology> and <trajectory> for <segment> """
     domain      = kwargs.get("domain",      "")
     selection   = kwargs.get("selection",   "protein")
     trj         = md.Universe(segment.topology, segment.trajectory)
