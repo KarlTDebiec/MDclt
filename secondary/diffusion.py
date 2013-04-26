@@ -3,7 +3,7 @@
 desc = """diffusion.py
     Functions for secondary analysis of diffusion
     Written by Karl Debiec on 13-02-08
-    Last updated 13-04-25"""
+    Last updated 13-04-26"""
 ########################################### MODULES, SETTINGS, AND DEFAULTS ############################################
 import os, sys
 import time as time_module
