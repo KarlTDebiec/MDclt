@@ -3,7 +3,7 @@
 desc = """general.py
     Functions for primary analysis of molecular dynamics trajectories
     Written by Karl Debiec on 12-11-30
-    Last updated 13-04-25"""
+    Last updated 13-04-30"""
 ########################################### MODULES, SETTINGS, AND DEFAULTS ############################################
 import os, sys
 import numpy as np
@@ -21,7 +21,6 @@ def com(segment, **kwargs):
     trj         = md.Universe(segment.topology, segment.trajectory)
     com         = np.zeros((len(trj.trajectory), 3))
     trj_sel     = trj.selectAtoms(selection)
-    n_atoms     = trj_sel.numberOfAtoms()
     for i, frame in enumerate(trj.trajectory):
         com[i]  = trj_sel.centerOfMass()
     return  [("/" + segment + "/com_" + domain, com),
