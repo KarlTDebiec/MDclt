@@ -1,5 +1,4 @@
 #!/usr/bin/python
-
 desc = """analogue.py
     Functions for secondary analysis of amino acid analogue datasets
     Written by Karl Debiec on 12-08-15
