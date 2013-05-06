@@ -1,9 +1,8 @@
 #!/usr/bin/python
-
 desc = """analysis_toolkit.py
     Toolkit for analysis of molecular dynamics simulations
     Written by Karl Debiec on 12-02-12
-    Last updated 13-02-08"""
+    Last updated 13-05-04"""
 ########################################### MODULES, SETTINGS, AND DEFAULTS ############################################
 import inspect, os, sys
 import h5py

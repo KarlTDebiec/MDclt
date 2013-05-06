@@ -1,9 +1,8 @@
 #!/usr/bin/python
-
 desc = """vmd.py
     Functions for primary analysis of molecular dynamics trajectories using vmd
     Written by Karl Debiec on 13-03-06
-    Last updated 13-03-06"""
+    Last updated 13-05-04"""
 ########################################### MODULES, SETTINGS, AND DEFAULTS ############################################
 import os, sys
 import numpy as np
@@ -15,7 +14,7 @@ def rmsd(segment, **kwargs):
     domain      = kwargs.get("domain",    "")
     selection   = kwargs.get("selection", "protein and name CA")
     reference   = kwargs.get("reference")
-    script      = "/".join(os.path.abspath(__file__).split('/')[:-2] + ['tcl', 'vmd_rmsd.tcl'])
+    script      = "/".join(os.path.abspath(__file__).split('/')[:-2] + ["tcl", "vmd_rmsd.tcl"])
     command     = "{0} -dispdev text -e {1} -args {2} {3} {4} \"{5}\"".format(vmd, script, segment.topology,
                                                                               segment.trajectory, reference, selection)
     for line in _shell_executor(command):
@@ -39,5 +38,3 @@ def _check_rmsd(hdf5_file, segment, **kwargs):
              segment + "/rotmat_" + domain] in hdf5_file):
             return [(rmsd, segment, kwargs)]
     else:   return False
-
-

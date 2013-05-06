@@ -1,9 +1,8 @@
 #!/usr/bin/python
-
 desc = """general.py
     Functions for primary analysis of molecular dynamics trajectories
     Written by Karl Debiec on 12-11-30
-    Last updated 13-04-30"""
+    Last updated 13-05-04"""
 ########################################### MODULES, SETTINGS, AND DEFAULTS ############################################
 import os, sys
 import numpy as np
@@ -15,7 +14,7 @@ from   cython_functions   import _cy_contact
 from   standard_functions import is_num, _contact_2D_to_1D_indexes
 ################################################## ANALYSIS FUNCTIONS ##################################################
 def com(segment, **kwargs):
-    """ Calculates center of mass of <domain> with selection <group> from <topology> and <trajectory> for <segment> """
+    """ Calculates center of mass of <domain> with <selection> """
     domain      = kwargs.get("domain",      "")
     selection   = kwargs.get("selection",   "protein")
     trj         = md.Universe(segment.topology, segment.trajectory)
@@ -61,8 +60,7 @@ def _check_rmsd(hdf5_file, segment, **kwargs):
 
 
 def contact(segment, **kwargs):
-    """ Calculates inter-residue contacts from <topology> and <trajectory> for <segment>
-        Contact defined as heavy-atom minimum distance within 5.5 Angstrom """
+    """ Calculates inter-residue contacts, defined as heavy-atom minimum distance within 5.5 Angstrom """
     res_selection   = kwargs.get("res_selection",  "(protein or resname ACE)")
     atom_selection  = kwargs.get("atom_selection", "(name C* or name N* or name O* or name S*)")
     trj             = md.Universe(segment.topology, segment.trajectory)

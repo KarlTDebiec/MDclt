@@ -42,5 +42,3 @@ set selection   [lindex $argv 3];
 
 rmsd $topology $trajectory $reference $selection
 exit
-
-
