@@ -2,7 +2,7 @@
 desc = """energy.py
     Functions for secondary analysis of energy
     Written by Karl Debiec on 13-05-06
-    Last updated 13-05-06"""
+    Last updated 13-05-12"""
 ########################################### MODULES, SETTINGS, AND DEFAULTS ############################################
 import os, sys
 import numpy as np
@@ -10,7 +10,7 @@ from   scipy.stats import linregress
 ################################################## ANALYSIS FUNCTIONS ##################################################
 def conservation(hdf5_file, n_cores = 1, **kwargs):
     """ Calculates energy drift """
-    verbose     = kwargs.get("verbose",     False)  # Print output to terminal
+    verbose     = kwargs.get("verbose",     False)          # Print output to terminal
     time        = hdf5_file.data["*/log"]["time"]
     energy      = hdf5_file.data["*/log"]["total"]
     temperature = hdf5_file.data["*/log"]["temperature"]
@@ -39,19 +39,15 @@ def _check_conservation(hdf5_file, **kwargs):
     verbose     = kwargs.get("verbose",     False)
     force       = kwargs.get("force",       False)
     expected    = ["/energy/conservation"]
-
-    hdf5_file.load("*/log", **{"type": "table"})
-
+    hdf5_file.load("*/log", type = "table")
     if     (force
     or not (expected in hdf5_file)):
         return [(conservation, kwargs)]
-
-    attrs       = hdf5_file.attrs("/energy/conservation")
-
+    attrs       = hdf5_file.attrs("energy/conservation")
     if hdf5_file.data["*/log"]["time"][-1] != attrs["time"]:
         return [(conservation, kwargs)]
     elif verbose:
-        data    = hdf5_file["/energy/conservation"]
+        data    = hdf5_file["energy/conservation"]
         print "DURATION  {0:6d} ns".format(int(attrs["time"]))
         print "          ENERGY                 TEMPERATURE"
         print "SLOPE     {0:12.5f} kcal ns-1 {1:9.5f} K ns-1".format(float(data["energy slope"]),

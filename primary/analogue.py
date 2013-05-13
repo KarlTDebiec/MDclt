@@ -1,31 +1,30 @@
 #!/usr/bin/python
-
 desc = """analogue.py
     Functions for analysis of amino acid analogue trajectories
     Written by Karl Debiec on 12-11-30
-    Last updated 13-03-06"""
+    Last updated 13-05-12"""
 ########################################### MODULES, SETTINGS, AND DEFAULTS ############################################
 import os, sys
 import numpy as np
 import MDAnalysis as md
 from   cython_functions import _cy_distance_pbc
 ################################################## ANALYSIS FUNCTIONS ##################################################
-def com(arguments):
+def com(segment, **kwargs):
     """ Calculates center of mass distance between two residue types; assumes cubic box and pbc """
-    alg1        = kwargs.get("alg1")
-    alg2        = kwargs.get("alg1") 
+    alg1        = kwargs.get("residue_1")
+    alg2        = kwargs.get("residue_2")
     trj         = md.Universe(segment.topology, segment.trajectory)
     alg1s       = [r.atoms for r in trj.residues if r.name == alg1]
     alg2s       = [r.atoms for r in trj.residues if r.name == alg2]
     alg1s_com   = np.zeros((len(alg1s), 3))
     alg2s_com   = np.zeros((len(alg2s), 3))
-    distances   = np.zeros((len(trj.trajectory), len(alg1s), len(alg2s)))
+    distances   = np.zeros((len(trj.trajectory), len(alg1s), len(alg2s)), dtype = np.float32)
     for i, frame in enumerate(trj.trajectory):
-        for j, alg1 in enumerate(alg1s):  alg1s_com[j] = np.array(alg1.centerOfMass(), dtype = np.float64)
-        for j, alg2 in enumerate(alg2s):  alg2s_com[j] = np.array(alg2.centerOfMass(), dtype = np.float64)
+        for j, alg1 in enumerate(alg1s):  alg1s_com[j] = np.array(alg1.centerOfMass())
+        for j, alg2 in enumerate(alg2s):  alg2s_com[j] = np.array(alg2.centerOfMass())
         distances[i]  = _cy_distance_pbc(alg1s_com, alg2s_com, float(frame.dimensions[0]))
-    return  [("/" + segment + "/association_com",   distances),
-             ("/" + segment + "/association_com",   {'units': "A"})]
+    return  [(segment + "/association_com", distances),
+             (segment + "/association_com", {"units": "A"})]
 def _check_com(hdf5_file, segment, **kwargs):
     if not (segment + "/association_com" in hdf5_file):
             return [(com, segment, kwargs)]
@@ -64,5 +63,3 @@ def _check_com(hdf5_file, segment, **kwargs):
 #    segment, path, topology, trajectory = segment
 #    if not segment + "/salt_bridge" in hierarchy:   return [(salt_bridge, (segment, topology, trajectory))]
 #    else:                                           return False
-
-

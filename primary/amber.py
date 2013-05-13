@@ -2,12 +2,12 @@
 desc = """amber.py
     Functions for primary analysis of AMBER trajectories
     Written by Karl Debiec on 12-12-01
-    Last updated 13-05-04"""
+    Last updated 13-05-12"""
 ########################################### MODULES, SETTINGS, AND DEFAULTS ############################################
 import commands, os, sys
 import numpy as np
 ################################################## ANALYSIS FUNCTIONS ##################################################
-def energy(segment, **kwargs):
+def log(segment, **kwargs):
     """ Parses log for <segment> """
     log         = segment.file_of_type(".out")
     time_offset = kwargs.get("time_offset", 0.0)
@@ -85,13 +85,9 @@ def energy(segment, **kwargs):
     attrs_line  = attrs_line[:-1]   + "}"
     log         = np.array(eval(log_line), eval(dtype_line))
     log_attrs   = eval(attrs_line)
-    return [("/" + segment + "/time",   data["TIME(PS)"]),
-            ("/" + segment + "/log",    log),
-            ("/" + segment,             seg_attrs),
-            ("/" + segment + "/time",   {"units": "ns"}),
-            ("/" + segment + "/log",    log_attrs)]
-def _check_energy(hdf5_file, segment, **kwargs):
-    if not ([segment + "/time",
-             segment + "/log"]  in hdf5_file):
-            return [(energy, segment, kwargs)]
-    else:   return False
+    return [(segment + "/log",    log),
+            (segment + "/",       seg_attrs),
+            (segment + "/log",    log_attrs)]
+def _check_log(hdf5_file, segment, **kwargs):
+    if not (segment + "/log" in hdf5_file): return [(log, segment, kwargs)]
+    else:                                   return False

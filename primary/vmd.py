@@ -2,7 +2,7 @@
 desc = """vmd.py
     Functions for primary analysis of molecular dynamics trajectories using vmd
     Written by Karl Debiec on 13-03-06
-    Last updated 13-05-04"""
+    Last updated 13-05-12"""
 ########################################### MODULES, SETTINGS, AND DEFAULTS ############################################
 import os, sys
 import numpy as np
@@ -14,24 +14,24 @@ def rmsd(segment, **kwargs):
     domain      = kwargs.get("domain",    "")
     selection   = kwargs.get("selection", "protein and name CA")
     reference   = kwargs.get("reference")
-    script      = "/".join(os.path.abspath(__file__).split('/')[:-2] + ["tcl", "vmd_rmsd.tcl"])
+    script      = "/".join(os.path.abspath(__file__).split("/")[:-2] + ["tcl", "vmd_rmsd.tcl"])
     command     = "{0} -dispdev text -e {1} -args {2} {3} {4} \"{5}\"".format(vmd, script, segment.topology,
                                                                               segment.trajectory, reference, selection)
     for line in _shell_executor(command):
         if line.startswith("N_FRAMES"):
             n_frames    = float(line.split()[1])
-            rmsd        = np.zeros(n_frames)
-            rotmat      = np.zeros((n_frames, 9))
+            rmsd        = np.zeros(n_frames,     dtype = np.float32)
+            rotmat      = np.zeros((n_frames, 9, dtype = np.float32))
             i           = 0
         elif line.startswith("ROTMAT"):
             rotmat[i]   = line.split()[1:]
         elif line.startswith("RMSD"):
             rmsd[i]     = line.split()[1]
             i          += 1
-    return  [("/" + segment + "/rmsd_"   + domain,  rmsd),
-             ("/" + segment + "/rotmat_" + domain,  rotmat),
-             ("/" + segment + "/rmsd_"   + domain,  {'selection': selection,    'units': "A"}),
-             ("/" + segment + "/rotmat_" + domain,  {'selection': selection})]
+    return  [(segment + "/rmsd_"   + domain,  rmsd),
+             (segment + "/rotmat_" + domain,  rotmat),
+             (segment + "/rmsd_"   + domain,  {"selection": selection, "method": "vmd", "units": "A"}),
+             (segment + "/rotmat_" + domain,  {"selection": selection, "method": "vmd"})]
 def _check_rmsd(hdf5_file, segment, **kwargs):
     domain  = kwargs.get("domain",    "")
     if not ([segment + "/rmsd_"   + domain,

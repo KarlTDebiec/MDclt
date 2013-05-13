@@ -2,9 +2,9 @@
 desc = """analysis_toolkit.py
     Toolkit for analysis of molecular dynamics simulations
     Written by Karl Debiec on 12-02-12
-    Last updated 13-05-06"""
+    Last updated 13-05-11"""
 ########################################### MODULES, SETTINGS, AND DEFAULTS ############################################
-import inspect, os, sys
+import inspect, os, sys, types
 import h5py
 import numpy as np
 from   multiprocessing import Pool
@@ -46,10 +46,15 @@ def analyze_primary(hdf5_filename, path, segment_lister, analyses, n_cores = 1):
         1) Builds list of trajectory segments at <path> using function <segment_lister>
         2) Builds task list based on requested <analyses>, data present in <hdf5_filename>, and segments at <path>
         3) Distributes tasks across <n_cores> and writes results to <hdf5_filename> """
-    print "Analyzing trajectory at {0}".format(path.replace('//','/'))
-    import_module(segment_lister.split(".")[0])
+    print "Analyzing trajectory at {0}".format(path.replace("//","/"))
     for module in set([m.split(".")[0] for m in [a[0] for a in analyses]]): import_module("primary." + module)
-    segments        = _string_to_function(segment_lister)(path)
+    if   type(segment_lister) == types.FunctionType:
+        segments    = segment_lister(path)
+    elif type(segment_lister) == types.StringType:
+        import_module(segment_lister.split(".")[0])
+        segments        = _string_to_function(segment_lister)(path)
+    else:
+        raise Exception("segment_lister must be a function or string in format of 'module.function'")
     with HDF5_File(hdf5_filename) as hdf5_file:
         task_list   = _primary_make_task_list(hdf5_file, segments, analyses)
         print "{0} tasks to be completed for {1} segments using {2} cores".format(len(task_list),len(segments),n_cores)
@@ -77,8 +82,8 @@ def analyze_secondary(hdf5_filename, analyses, n_cores = 1):
     """ Performs secondary analysis (analysis of primary analysis)
         1) Builds task list based on <analyses>, loads required data from <hdf5_filename>
         2) Completes tasks in serial, using <n_cores> for each task if implemented, and saves results to <hdf5_file>"""
-    print "Analyzing file {0}".format(hdf5_filename)
-    for module in set([m.split('.')[0] for m in [a[0] for a in analyses]]): import_module("secondary." + module)
+    print "Analyzing file {0}".format(hdf5_filename.replace("//","/"))
+    for module in set([m.split(".")[0] for m in [a[0] for a in analyses]]): import_module("secondary." + module)
     with HDF5_File(hdf5_filename) as hdf5_file:
         task_list    = _secondary_make_task_list(hdf5_file, analyses)
         _secondary_complete_tasks(hdf5_file, task_list, n_cores)

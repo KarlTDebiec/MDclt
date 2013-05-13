@@ -8,7 +8,7 @@ import os, sys
 import h5py
 import numpy as np
 from   collections import OrderedDict
-from   standard_functions import is_num
+from   standard_functions import is_num, Function_to_Method_Wrapper
 ######################################################## CLASS #########################################################
 class HDF5_File:
     def __init__(self, filename):
@@ -23,9 +23,9 @@ class HDF5_File:
         self.file.close()
     def __contains__(self, items):
         if type(items) == list:
-            for item in list(items):
-                if not self._strip_path(item) in self.hierarchy:    return False
-        elif not (self._strip_path(items) in self.hierarchy):       return False
+            for item in map(self._strip_path, items):
+                if not item in self.hierarchy:                  return False
+        elif not (self._strip_path(items) in self.hierarchy):   return False
         return True
     def __getitem__(self, path):
         if self._strip_path(path) in self:
@@ -43,9 +43,12 @@ class HDF5_File:
         processor   = kwargs.get("processor", self._process_default)
         return  processor(self[path])
     def _load_split(self, path, **kwargs):
-        shaper          = kwargs.get("shaper",        self._shape_default)
-        processor       = kwargs.get("processor",     self._process_default)
-        postprocessor   = kwargs.get("postprocessor", self._postprocess_default)
+        if ("shaper"        in kwargs): shaper          = Function_to_Method_Wrapper(self, kwargs.get("shaper"))
+        else:                           shaper          = self._shape_default
+        if ("processor"     in kwargs): processor       = Function_to_Method_Wrapper(self, kwargs.get("processor"))
+        else:                           processor       = self._process_default
+        if ("postprocessor" in kwargs): postprocessor   = Function_to_Method_Wrapper(self, kwargs.get("postprocessor"))
+        else:                           postprocessor   = self._postprocess_default
         shapes          = np.array([self.hierarchy[segment + "/" + path[2:]].shape for segment in self._segments()])
         total_shape     = shaper(shapes)
         data            = np.zeros(total_shape)

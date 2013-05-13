@@ -2,7 +2,7 @@
 desc = """diffusion.py
     Functions for secondary analysis of diffusion
     Written by Karl Debiec on 13-02-08
-    Last updated 13-05-06"""
+    Last updated 13-05-12"""
 ########################################### MODULES, SETTINGS, AND DEFAULTS ############################################
 import os, sys
 import time as time_module
@@ -37,8 +37,8 @@ def _Q_diag_to_D_2D(Qxx, Qyy, Qzz):
     Dzz =  Qxx + Qyy - Qzz
     return np.array([[Dxx,0,0],[0,Dyy,0],[0,0,Dzz]])
 ################################################ PRIMARY DATA FUNCTIONS ################################################
-def _shape_rotmat(shapes):      return np.array([np.sum(shapes[:, 0]), 3, 3])
-def _process_rotmat(new_data):  return np.reshape(new_data, (new_data.shape[0], 3, 3))
+def _shape_rotmat(self, shapes):      return np.array([np.sum(shapes[:, 0]), 3, 3])
+def _process_rotmat(self, new_data):  return np.reshape(new_data, (new_data.shape[0], 3, 3))
 ################################################## ANALYSIS FUNCTIONS ##################################################
 def rotation(hdf5_file, n_cores = 1, **kwargs):
     """ Calculates the rotational diffusion tensor of <domain> as it rotates by |rotmat| over a trajectory of length
@@ -48,22 +48,22 @@ def rotation(hdf5_file, n_cores = 1, **kwargs):
         value decomposition. Primary data may optionally be downsampled by <index_slice> for faster calculation.
         <convergence> may optionally be estimated by repeating calculations for halves and quarters of the dataset.
         Follows the protocol of Wong, V., and Case, D. A. J Phys Chem B. 2008. 112. 6013-6024. """
-    domain      = kwargs.get("domain",      "")                         # Domain name
-    index_slice = kwargs.get("index_slice", 1)                          # Downsample trajectory (use every Nth frame)
-    tau_finites = kwargs.get("tau_finite",  np.array([1.0]))            # Finite cutoff for autocorrelation integration
-    n_vectors   = kwargs.get("n_vectors",   1000)                       # Number of unit vectors
-    control     = kwargs.get("control",     float("nan"))               # Control value for comparison
-    convergence = kwargs.get("convergence", False)                      # Calculate for halves, quarters for convergence
-    verbose     = kwargs.get("verbose",     False)                      # Print output to terminal
+    domain      = kwargs.get("domain",      "")             # Domain name
+    index_slice = kwargs.get("index_slice", 1)              # Downsample trajectory (use every Nth frame)
+    tau_finites = kwargs.get("tau_finite",  np.array([1.0]))# Finite cutoff for autocorrelation integration
+    n_vectors   = kwargs.get("n_vectors",   1000)           # Number of unit vectors
+    control     = kwargs.get("control",     np.nan)         # Control value for comparison
+    convergence = kwargs.get("convergence", False)          # Calculate for halves, quarters for convergence
+    verbose     = kwargs.get("verbose",     False)          # Print output to terminal
 
-    time_full   = hdf5_file.data['*/time'][::index_slice]
-    rotmat_full = hdf5_file.data['*/rotmat_' + domain][::index_slice]
+    time_full   = hdf5_file.data["*/log"]["time"][::index_slice]
+    rotmat_full = hdf5_file.data["*/rotmat_" + domain][::index_slice]
     size        = time_full.size
     dt          = time_full[1] - time_full[0]
     vectors     = _random_unit_vectors(n_vectors)
 
-    if index_slice == 1: output_path = "/diffusion/rotation_{0}/".format(domain)
-    else:                output_path = "/diffusion/rotation_{0}/slice_{1:d}/".format(domain, int(index_slice))
+    if index_slice == 1: output_path = "diffusion/rotation_{0}/".format(domain)
+    else:                output_path = "diffusion/rotation_{0}/slice_{1:d}/".format(domain, int(index_slice))
     if convergence:      splits      = [("full",      "[:]"),
                                         ("half/1",    "[:size/2]"),         ("half/2",    "[size/2:]"),
                                         ("quarter/1", "[:size/4]"),         ("quarter/2", "[size/4:size/2]"),
@@ -139,14 +139,14 @@ def _check_rotation(hdf5_file, **kwargs):
     verbose     = kwargs.get("verbose",     False)
     force       = kwargs.get("force",       False)
 
-    if index_slice == 1: output_path = "/diffusion/rotation_{0}/".format(domain)
-    else:                output_path = "/diffusion/rotation_{0}/slice_{1:d}/".format(domain, int(index_slice))
+    if index_slice == 1: output_path = "diffusion/rotation_{0}/".format(domain)
+    else:                output_path = "diffusion/rotation_{0}/slice_{1:d}/".format(domain, int(index_slice))
     if convergence:      splits      = ["full","half/1","half/2","quarter/1","quarter/2","quarter/3","quarter/4"]
     else:                splits      = ["full"]
     expected    = [output_path + "/tau_finite"] 
     expected   += [output_path + "/" + path + "/D" for path in splits]
 
-    hdf5_file.load("*/time")
+    hdf5_file.load("*/log", type = "table")
     hdf5_file.load("*/rotmat_" + domain, shaper = _shape_rotmat, processor = _process_rotmat)
 
     if (force
@@ -194,25 +194,25 @@ def _check_rotation(hdf5_file, **kwargs):
     return False
 
 def translation(hdf5_file, n_cores = 1, **kwargs):
-    """ Calculates the translation diffusion coefficient of <domain>
-        Follows to protocol of McGuffee, S. R., and Elcock, A. H. PLoS Comp Bio. 2010. e1000694. """
-    domain      = kwargs.get("domain",      "")                         # Domain name
-    index_slice = kwargs.get("index_slice", 1)                          # Downsample trajectory (use every Nth frame)
-    delta_ts    = kwargs.get("delta_t",     np.array([0.1]))            # Delta_t values to test (ns)
-    pbc_cutoff  = kwargs.get("pbc_cutoff",  float("nan"))               # Discard points that drift more than this
-                                                                        #   amount; shameful alternative to properly
-                                                                        #   adjusting for periodic boundary conditions
-    control     = kwargs.get("control",     float("nan"))               # Control value for comparison
-    convergence = kwargs.get("convergence", False)                      # Calculate for halves, quarters for convergence
-    verbose     = kwargs.get("verbose",     False)                      # Print output to terminal
+    """ Calculates the translational diffusion coefficient of <domain>
+        Follows the protocol of McGuffee, S. R., and Elcock, A. H. PLoS Comp Bio. 2010. e1000694. """
+    domain      = kwargs.get("domain",      "")             # Domain name
+    index_slice = kwargs.get("index_slice", 1)              # Downsample trajectory (use every Nth frame)
+    delta_ts    = kwargs.get("delta_t",     np.array([0.1]))# Delta_t values to test (ns)
+    pbc_cutoff  = kwargs.get("pbc_cutoff",  np.nan)         # Discard points that drift more than this amount; shameful
+                                                            # alternative to properly adjusting for periodic boundary
+                                                            # conditions
+    control     = kwargs.get("control",     np.nan)         # Control value for comparison
+    convergence = kwargs.get("convergence", False)          # Calculate for halves, quarters for convergence
+    verbose     = kwargs.get("verbose",     False)          # Print output to terminal
 
-    time_full   = hdf5_file.data["*/time"][::index_slice]
+    time_full   = hdf5_file.data["*/log"]["time"][::index_slice]
     com_full    = hdf5_file.data["*/com_" + domain][::index_slice]
     size        = time_full.size
     dt          = time_full[1] - time_full[0]
 
-    if index_slice == 1: output_path = "/diffusion/translation_{0}/".format(domain)
-    else:                output_path = "/diffusion/translation_{0}/slice_{1:d}/".format(domain, int(index_slice))
+    if index_slice == 1: output_path = "diffusion/translation_{0}/".format(domain)
+    else:                output_path = "diffusion/translation_{0}/slice_{1:d}/".format(domain, int(index_slice))
     if convergence:      splits      = [("full",      "[:]"),
                                         ("half/1",    "[:size/2]"),         ("half/2",    "[size/2:]"),
                                         ("quarter/1", "[:size/4]"),         ("quarter/2", "[size/4:size/2]"),
@@ -248,21 +248,21 @@ def translation(hdf5_file, n_cores = 1, **kwargs):
 def _check_translation(hdf5_file, **kwargs):
     domain      = kwargs.get("domain",    "")
     index_slice = kwargs.get("index_slice", 1)
-    delta_ts    = kwargs.get("delta_t",     np.array([1000.0]))
-    pbc_cutoff  = kwargs.get("pbc_cutoff",  float("nan"))
-    control     = kwargs.get("control",     float("nan"))
+    delta_ts    = kwargs.get("delta_t",     np.array([0.1]))
+    pbc_cutoff  = kwargs.get("pbc_cutoff",  np.nan)
+    control     = kwargs.get("control",     np.nan)
     convergence = kwargs.get("convergence", False)
     verbose     = kwargs.get("verbose",     False)
     force       = kwargs.get("force",       False)
 
-    if index_slice == 1: output_path = "/diffusion/translation_{0}/".format(domain)
-    else:                output_path = "/diffusion/translation_{0}/slice_{1:d}/".format(domain, int(index_slice))
+    if index_slice == 1: output_path = "diffusion/translation_{0}/".format(domain)
+    else:                output_path = "diffusion/translation_{0}/slice_{1:d}/".format(domain, int(index_slice))
     if convergence:      splits      = ["full","half/1","half/2","quarter/1","quarter/2","quarter/3","quarter/4"]
     else:                splits      = ["full"]
     expected    = [output_path + "/delta_t"]
     expected   += [output_path + "/" + path + "/D" for path in splits]
 
-    hdf5_file.load("*/time")
+    hdf5_file.load("*/log", type = "table")    
     hdf5_file.load("*/com_" + domain)
 
     if (force
@@ -270,9 +270,9 @@ def _check_translation(hdf5_file, **kwargs):
         return [(translation, kwargs)]
 
     attrs       = hdf5_file.attrs(output_path)
-    if (pbc_cutoff                                  != attrs["pbc_cutoff"]
-    or  hdf5_file.data["*/time"][::index_slice][-1] != attrs["time"]
-    or  np.all(hdf5_file[output_path + "/delta_t"]  != delta_ts)):
+    if (pbc_cutoff                                         != attrs["pbc_cutoff"]
+    or  hdf5_file.data["*/log"]["time"][::index_slice][-1] != attrs["time"]
+    or  np.all(hdf5_file[output_path + "/delta_t"]         != delta_ts)):
         return [(translation, kwargs)]
     elif verbose:
         for path in expected[1:]:

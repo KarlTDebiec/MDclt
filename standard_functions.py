@@ -1,13 +1,12 @@
 #!/usr/bin/python
-
 desc = """standard_functions.py
     Standard functions
     Written by Karl Debiec on 13-02-03
-    Last updated 13-03-06"""
+    Last updated 13-05-12"""
 ########################################### MODULES, SETTINGS, AND DEFAULTS ############################################
 import os, subprocess, sys
 import numpy as np
-################################################ SEGMENT LIST FUNCTIONS ################################################
+####################################################### CLASSES ########################################################
 class Segment:
     def __init__(self, number, path, topology, trajectory, files):
         self.number     = number
@@ -24,15 +23,25 @@ class Segment:
         temp    = [f for f in self.files if f.endswith(end)]
         if len(temp) == 1:  return temp[0]
         else:               raise
-def segments_standard(path):
-    """ Lists segment folders, topologies, and trajectories  at <path>, assuming the format ####/####.* """
+class Function_to_Method_Wrapper:
+    def __init__(self, host, function):
+        self.host       = host
+        self.function   = function
+        setattr(host, function.__name__, self)
+    def __call__(self, *args, **kwargs):
+        args    = [self.host] + list(args)
+        return self.function(*args, **kwargs)
+################################################ SEGMENT LIST FUNCTIONS ################################################
+def segments_standard(sim_root):
+    """ Lists segment files, topologies, and trajectories at <sim_root>, assuming the format ####/####.* """
     segments = []
-    for directory in sorted([f for f in os.listdir(path) if is_num(f)]):
-        files       = ["{0}/{1}/{2}".format(path, directory, f) for f in os.listdir("{0}/{1}/".format(path, directory))]
-        segments   += [Segment(number       = directory,
-                               path         = "{0}/{1}/".format(path, directory),
-                               topology     = "{0}/{1}/{1}_solute.pdb".format(path, directory),
-                               trajectory   = "{0}/{1}/{1}_solute.xtc".format(path, directory),
+    for seg_dir in sorted([f for f in os.listdir(sim_root) if is_num(f)]):
+        files       = ["{0}/{1}/{2}".format(sim_root, seg_dir, f)
+                        for f in os.listdir("{0}/{1}/".format(sim_root, seg_dir))]
+        segments   += [Segment(number       = seg_dir,
+                               path         = "{0}/{1}/".format(sim_root, seg_dir),
+                               topology     = "{0}/{1}/{1}_solute.pdb".format(sim_root, seg_dir),
+                               trajectory   = "{0}/{1}/{1}_solute.xtc".format(sim_root, seg_dir),
                                files        = files)]
     return segments
 ################################################## GENERAL FUNCTIONS ###################################################
@@ -41,17 +50,17 @@ def is_num(test):
     except: return False
     return  True
 def month(string):
-    month = {'jan':  1, 'feb':  2, 'mar':  3, 'apr':  4, 'may':  5, 'jun':  6,
-             'jul':  7, 'aug':  8, 'sep':  9, 'oct': 10, 'nov': 11, 'dec': 12}
+    month = {"jan":  1, "feb":  2, "mar":  3, "apr":  4, "may":  5, "jun":  6,
+             "jul":  7, "aug":  8, "sep":  9, "oct": 10, "nov": 11, "dec": 12}
     try:    return month[string.lower()]
     except: return None
 def _string_to_function(module_function):
-    module, function = module_function.split('.')
+    module, function = module_function.split(".")
     return getattr(sys.modules[module], function)
 def _shell_executor(command):
     pipe    = subprocess.Popen(command, shell = True, stdout = subprocess.PIPE, stderr = subprocess.PIPE)
-    for line in iter(pipe.stdout.readline, ''):
-        yield line.rstrip().replace('\n', ' ')
+    for line in iter(pipe.stdout.readline, ""):
+        yield line.rstrip().replace("\n", " ")
     pipe.wait()
 ################################################## ANALYSIS FUNCTIONS ##################################################
 def _contact_1D_to_2D_map(contact_1D):
@@ -81,5 +90,3 @@ def _contact_1D_to_2D_indexes(n_res):
             indexes[i]  = [j, k]
             i          += 1
     return indexes
-
-
