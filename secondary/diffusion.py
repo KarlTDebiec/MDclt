@@ -155,9 +155,9 @@ def _check_rotation(hdf5_file, **kwargs):
 
     attrs       = hdf5_file.attrs(output_path)
 
-    if (n_vectors                                     != attrs["n_vectors"]
-    or  hdf5_file.data["*/time"][::index_slice][-1]   != attrs["time"]
-    or  np.all(hdf5_file[output_path + "/tau_finite"] != tau_finites)):
+    if (n_vectors                                          != attrs["n_vectors"]
+    or  hdf5_file.data["*/log"]["time"][::index_slice][-1] != attrs["time"]
+    or  np.all(hdf5_file[output_path + "/tau_finite"]      != tau_finites)):
         return [(rotation, kwargs)]
     elif verbose:
         for path in expected[1:]:
