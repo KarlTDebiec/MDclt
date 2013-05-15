@@ -60,7 +60,8 @@ class HDF5_File:
         return postprocessor(data)
     def _load_split_table(self, path, **kwargs):
         dtype   = self.hierarchy[self._segments()[0] + "/" + path[2:]].dtype
-        shapes  = np.array([self.hierarchy[segment + "/" + path[2:]].size for segment in self._segments()])
+
+        shapes  = np.array([self.hierarchy[segment + "/" + path[2:]].shape[0] for segment in self._segments()])
         data    = np.zeros((np.sum(shapes)), dtype)
         i       = 0
         for segment in self._segments():
