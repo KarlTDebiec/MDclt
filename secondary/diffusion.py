@@ -37,8 +37,8 @@ def _Q_diag_to_D_2D(Qxx, Qyy, Qzz):
     Dzz =  Qxx + Qyy - Qzz
     return np.array([[Dxx,0,0],[0,Dyy,0],[0,0,Dzz]])
 ################################################ PRIMARY DATA FUNCTIONS ################################################
-def _shape_rotmat(self, shapes):      return np.array([np.sum(shapes[:, 0]), 3, 3])
-def _process_rotmat(self, new_data):  return np.reshape(new_data, (new_data.shape[0], 3, 3))
+def _shape_rotmat(self, shapes, **kwargs):      return np.array([np.sum(shapes[:, 0]), 3, 3])
+def _process_rotmat(self, new_data, **kwargs):  return np.reshape(new_data, (new_data.shape[0], 3, 3))
 ################################################## ANALYSIS FUNCTIONS ##################################################
 def rotation(hdf5_file, n_cores = 1, **kwargs):
     """ Calculates the rotational diffusion tensor of <domain> as it rotates by |rotmat| over a trajectory of length

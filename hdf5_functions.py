@@ -14,6 +14,7 @@ class HDF5_File:
     def __init__(self, filename):
         self.file       = h5py.File(filename)
         self.data       = {}
+        self.datakwargs = {}
         self._hierarchy()
     def __enter__(self):
         return self
@@ -40,8 +41,9 @@ class HDF5_File:
     def _strip_path(self, path):    return path.replace("//", "/").strip("/")
     def _segments(self):            return sorted([s for s in self.hierarchy if is_num(s)])
     def _load_complete(self, path, **kwargs):
-        processor   = kwargs.get("processor", self._process_default)
-        return  processor(self[path])
+        if ("processor"     in kwargs): processor       = Function_to_Method_Wrapper(self, kwargs.get("processor"))
+        else:                           processor       = self._process_default
+        return  processor(self[path], **kwargs)
     def _load_split(self, path, **kwargs):
         if ("shaper"        in kwargs): shaper          = Function_to_Method_Wrapper(self, kwargs.get("shaper"))
         else:                           shaper          = self._shape_default
@@ -50,17 +52,16 @@ class HDF5_File:
         if ("postprocessor" in kwargs): postprocessor   = Function_to_Method_Wrapper(self, kwargs.get("postprocessor"))
         else:                           postprocessor   = self._postprocess_default
         shapes          = np.array([self.hierarchy[segment + "/" + path[2:]].shape for segment in self._segments()])
-        total_shape     = shaper(shapes)
+        total_shape     = shaper(shapes, **kwargs)
         data            = np.zeros(total_shape)
         i               = 0
         for segment in self._segments():
-            new_data                    = processor(self[segment + "/" + path[2:]])
+            new_data                    = processor(self[segment + "/" + path[2:]], **kwargs)
             data[i:i+new_data.shape[0]] = new_data
             i                          += new_data.shape[0]
-        return postprocessor(data)
+        return postprocessor(data, **kwargs)
     def _load_split_table(self, path, **kwargs):
         dtype   = self.hierarchy[self._segments()[0] + "/" + path[2:]].dtype
-
         shapes  = np.array([self.hierarchy[segment + "/" + path[2:]].shape[0] for segment in self._segments()])
         data    = np.zeros((np.sum(shapes)), dtype)
         i       = 0
@@ -69,11 +70,11 @@ class HDF5_File:
             data[i:i+new_data.size]     = new_data
             i                          += new_data.shape[0]
         return data
-    def _shape_default(self, shapes):
-        if shapes.shape[1] == 1:            return np.sum(shapes)
-        else:                               return np.array([np.sum(shapes, axis = 0)[0]] +  list(shapes[0,1:]))
-    def _process_default(self, new_data):   return new_data
-    def _postprocess_default(self, data):   return data
+    def _shape_default(self, shapes, **kwargs):
+        if shapes.shape[1] == 1:                    return np.sum(shapes)
+        else:                                       return np.array([np.sum(shapes, axis = 0)[0]] + list(shapes[0,1:]))
+    def _process_default(self, data, **kwargs):     return data
+    def _postprocess_default(self, data, **kwargs): return data
 
     def add(self, path, data, **kwargs):
         verbose     = kwargs.get("verbose",     True)

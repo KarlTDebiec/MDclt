@@ -36,14 +36,14 @@ def _fit_sigmoid(x, y):
     y_fit   = max_asym + (min_asym - max_asym) / (1 + (x / poi) ** k)
     return min_asym, max_asym, poi, k, y_fit
 ################################################ PRIMARY DATA FUNCTIONS ################################################
-def _shape_association(self, shapes):
-    self.data["_n_residue_1"] = shapes[0,1]
-    self.data["_n_residue_2"] = shapes[0,2]
+def _shape_association(self, shapes, **kwargs):
+    self.datakwargs["n_residue_1"]  = shapes[0,1]
+    self.datakwargs["n_residue_2"]  = shapes[0,2]
     return np.array([np.sum(shapes, axis = 0)[0], shapes[0,1]])
-def _process_association(self, new_data):
-    return np.min(new_data, axis = 2)
+def _process_association(self, data, **kwargs):
+    return np.min(data, axis = 2)
 ################################################## ANALYSIS FUNCTIONS ##################################################
-def com(hdf5_file, n_cores = 1, **kwargs):
+def com(hdf5_file, **kwargs):
     """ Calculates Ka, kon, and koff of <n_residue_1> molecules of type 1 and <n_residue_2> molecules of type 2 in cubic
         box of <side length> with the bound state defined as center of mass distance below <cutoff> Angstrom. Follows
         the protocol of Piana, S., Lindorff-Larsen, K., Shaw, D.E. How Robust Are Protein Folding Simulations with
@@ -132,30 +132,27 @@ def com(hdf5_file, n_cores = 1, **kwargs):
              ("association/com/fpt/off",    fpt_off_attrs),
              ("association/com/fpt",        fpt_attrs),
              ("association/com",            {"cutoff": cutoff, "time": time[-1]})]
-def _check_com(hdf5_file, **kwargs):
-    def _load_association_com():
-        hdf5_file.load("*/association_com", shaper = _shape_association,  processor = _process_association)
+def _check_com(hdf5_file, force = False, **kwargs):
+    def _load_association():
+        hdf5_file.load("*/association_com", shaper = _shape_association,  processor = _process_association, **kwargs)
         kwargs["volume"]        = np.mean(hdf5_file.data["*/log"]["volume"])
-        kwargs["n_residue_1"]   = hdf5_file.data["_n_residue_1"]
-        kwargs["n_residue_2"]   = hdf5_file.data["_n_residue_2"]
-        del hdf5_file.data["_n_residue_1"]
-        del hdf5_file.data["_n_residue_2"]
+        kwargs["n_residue_1"]   = hdf5_file.datakwargs.pop("n_residue_1")
+        kwargs["n_residue_2"]   = hdf5_file.datakwargs.pop("n_residue_2")
     verbose     = kwargs.get("verbose", False)
-    force       = kwargs.get("force",   False)
     expected    = ["association/com/Ka", "association/com/block", "association/com/fpt/on", "association/com/fpt/off"]
 
     hdf5_file.load("*/log", type = "table")
 
     if (force
     or not(expected in hdf5_file)):
-        _load_association_com()
+        _load_association()
         return [(com, kwargs)]
     attrs   = hdf5_file.attrs("association/com")
     cutoff  = kwargs.get("cutoff",  4.5)
 
     if (cutoff                              != attrs["cutoff"]
     or  hdf5_file.data["*/log"]["time"][-1] != attrs["time"]):
-        _load_association_com()
+        _load_association()
         return [(com, kwargs)]
     elif verbose:
         Ka              = hdf5_file["association/com/Ka"]
@@ -173,3 +170,49 @@ def _check_com(hdf5_file, **kwargs):
         print "kon/koff    {0:>6.3f} M-1     ".format(fpt_attrs["Ka"])
         print "kon/koff se {0:>6.3f} M-1     ".format(fpt_attrs["Ka se"])
     return False
+
+def _shape_pmf(self, shapes, bins, **kwargs):
+    return np.array([shapes.shape[0], bins.size - 1])
+def _process_pmf(self, data, bins, **kwargs):
+    processed       = np.zeros((1, bins.size -1))
+    processed[0, :] = np.histogram(data, bins)[0]
+    return processed
+def _postprocess_pmf(self, data, **kwargs):
+    return  np.sum(data, axis = 0)
+
+def pmf(hdf5_file, **kwargs):
+    """ Calculates potential of mean force along a progress coordinate """
+    verbose         = kwargs.get("verbose",     False)      # Print output to terminal
+    time            = hdf5_file.data["*/log"]["time"]
+    com_dist        = hdf5_file.data["*/association_com"]
+    dt              = time[1] - time[0]
+
+def _check_pmf(hdf5_file, force = False, **kwargs):
+    def _load_association():
+        hdf5_file.load("*/association_" + pcoord, shaper = _shape_pmf,  processor = _process_pmf, 
+                       postprocessor = _postprocess_pmf, bins = bins, **kwargs)
+        print hdf5_file.data["*/association_" + pcoord]
+    verbose     = kwargs.get("verbose", False)
+    pcoord      = kwargs.get("pcoord",  "com")
+    bins        = kwargs.get("bins",    np.linspace(0., 50, 100))
+    T           = kwargs.get("T",       298)
+    expected    = ["association/" + pcoord + "/pmf"]
+
+    hdf5_file.load("*/log", type = "table")
+    if (force
+    or not(expected in hdf5_file)):
+        _load_association()
+#        return [(pmf, kwargs)]
+#    pmf     = hdf5_file["association/" + pcoord + "/pmf"]
+#    attrs   = hdf5_file.attrs("association/" + pcoord + "/pmf")
+
+#    if (bins                                != pmf["bins"]
+#    or  T                                   != attrs["T"]
+#    or  hdf5_file.data["*/log"]["time"][-1] != attrs["time"]):
+#        _load_association_com()
+#        return [(com, kwargs)]
+#    elif verbose:
+#        print "DURATION  {0:5d} ns CUTOFF {1:3.1f} A".format(int(attrs["time"]), float(attrs["cutoff"]))
+#        print "Ka          {0:>6.3f} M-1     ".format(float(Ka["Ka"][-1]))
+    return False
+
