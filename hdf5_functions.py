@@ -2,9 +2,9 @@
 desc = """hdf5_functions.py
     Class for simplifying interaction with HDF5 files
     Written by Karl Debiec on 13-02-03
-    Last updated 13-06-04"""
+    Last updated 13-06-06"""
 ########################################### MODULES, SETTINGS, AND DEFAULTS ############################################
-import os, sys
+import commands, os, sys
 import h5py
 import numpy as np
 from   collections import OrderedDict
@@ -12,15 +12,18 @@ from   standard_functions import is_num, Function_to_Method_Wrapper
 ######################################################## CLASS #########################################################
 class HDF5_File:
     def __init__(self, filename):
-        self.file       = h5py.File(filename)
+        self.filename   = os.path.abspath(filename)
+        self.file       = None
         self.data       = {}
-        self._hierarchy()
+        try:              self._quick_hierarchy()
+        except:           self._open_file()
     def __enter__(self):
         return self
     def __exit__(self, type, value, traceback):
         del self.hierarchy
-        self.file.flush()
-        self.file.close()
+        if  self.file:
+            self.file.flush()
+            self.file.close()
     def __contains__(self, items):
         if type(items) == list:
             for item in map(self._strip_path, items):
@@ -32,11 +35,17 @@ class HDF5_File:
             return np.array(self.hierarchy[self._strip_path(path)][...])
         else:
             raise Exception("Inappropriate input to HDF5_File.__getitem__(path):", self._strip_path(path))
+    def _open_file(self):
+        self.file   = h5py.File(self.filename)
+        self._hierarchy()
+    def _quick_hierarchy(self):
+        command         = "h5ls -r {0} | cut -b2- | awk '{{print $1}}'".format(self.filename)
+        self.hierarchy  = set(commands.getoutput(command).split())
     def _hierarchy(self):
         hierarchy = {}
         def get_hierarchy(x, y): hierarchy[x] = y
         self.file.visititems(get_hierarchy)
-        self.hierarchy  = OrderedDict(sorted(hierarchy.items(), key=lambda item: item[0]))
+        self.hierarchy  = hierarchy
     def _strip_path(self, path):    return path.replace("//", "/").strip("/")
     def _segments(self):            return sorted([s for s in self.hierarchy if is_num(s)])
     def _load_split_array(self, path, **kwargs):
@@ -68,9 +77,10 @@ class HDF5_File:
         return np.array(self[path], self[path].dtype)
 
     def add(self, path, data, data_kwargs = {"compression": "lzf"}, verbose = True, **kwargs):
-        path        = self._strip_path(path).split("/")
-        name        = path.pop()
-        group       = self.file
+        if not self.file:   self._open_file()
+        path    = self._strip_path(path).split("/")
+        name    = path.pop()
+        group   = self.file
         for subgroup in path:
             if   (subgroup in dict(group)): group = group[subgroup]
             else:                           group = group.create_group(subgroup)
@@ -84,6 +94,7 @@ class HDF5_File:
             if verbose:
                 print "    {0:25} added".format("/".join(path + [name]))
     def load(self, path, type = "array", **kwargs):
+        if not self.file: self._open_file()
         if   "loader" in kwargs:                       loader = Function_to_Method_Wrapper(self, kwargs.get("loader"))
         elif type == "array" and path.startswith("*"): loader = self._load_split_array
         elif type == "array":                          loader = self._load_whole_array
@@ -91,4 +102,5 @@ class HDF5_File:
         elif type == "table":                          loader = self._load_whole_table
         self.data[path] = loader(self._strip_path(path), **kwargs)
     def attrs(self, path, **kwargs):
-        return  dict(self.hierarchy[self._strip_path(path)].attrs)
+        if not self.file: self._open_file()
+        return dict(self.hierarchy[self._strip_path(path)].attrs)
