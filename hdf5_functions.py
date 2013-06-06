@@ -31,6 +31,7 @@ class HDF5_File:
         elif not (self._strip_path(items) in self.hierarchy):   return False
         return True
     def __getitem__(self, path):
+        if not self.file: self._open_file()
         if self._strip_path(path) in self:
             return np.array(self.hierarchy[self._strip_path(path)][...])
         else:

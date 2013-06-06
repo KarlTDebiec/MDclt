@@ -2,7 +2,7 @@
 desc = """diffusion.py
     Functions for secondary analysis of diffusion
     Written by Karl Debiec on 13-02-08
-    Last updated 13-06-04"""
+    Last updated 13-06-06"""
 ########################################### MODULES, SETTINGS, AND DEFAULTS ############################################
 import os, sys
 import time as time_module
@@ -190,15 +190,15 @@ def _check_rotation(hdf5_file, force = False, **kwargs):
     else:                splits     = [""]
     hdf5_file.load("*/log",              type   = "table")
     hdf5_file.load("*/rotmat_" + domain, loader = _load_rotmat)
-    if    (force
-    or not expected in hdf5_file):
+    if     (force
+    or not (expected in hdf5_file)):
         return [(rotation, kwargs)]
 
     tensor  = hdf5_file[expected]
     attrs   = hdf5_file.attrs(expected)
     if (n_vectors                                          != attrs["n_vectors"]
-    or  hdf5_file.data["*/log"]["time"][::index_slice][-1] != attrs["time"]
-    or  np.all(tensor["tau finite"]                        != tau_finites)):
+    or (np.any(np.array(tau_finites, np.float32)           != tensor["tau finite"]))
+    or (hdf5_file.data["*/log"]["time"][::index_slice][-1] != attrs["time"])):
         return [(rotation, kwargs)]
     elif verbose:
         for path in splits:
