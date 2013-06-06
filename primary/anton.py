@@ -1,6 +1,6 @@
 #!/usr/bin/python
 desc = """anton.py
-    Functions for primary analysis of Anton trajectories
+    Functions for primary analysis of ANTON trajectories
     Written by Karl Debiec on 12-11-29
     Last updated 13-06-04"""
 ########################################### MODULES, SETTINGS, AND DEFAULTS ############################################

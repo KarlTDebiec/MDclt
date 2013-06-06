@@ -1,6 +1,6 @@
 #!/usr/bin/python
 desc = """vmd.py
-    Functions for primary analysis of molecular dynamics trajectories using vmd
+    Functions for primary analysis of MD trajectories using Visual Molecular Dynamics
     Written by Karl Debiec on 13-03-06
     Last updated 13-06-04"""
 ########################################### MODULES, SETTINGS, AND DEFAULTS ############################################

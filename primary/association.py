@@ -1,6 +1,6 @@
 #!/usr/bin/python
-desc = """analogue.py
-    Functions for analysis of amino acid analogue trajectories
+desc = """association.py
+    Functions for primary analysis of molecular association
     Written by Karl Debiec on 12-11-30
     Last updated 13-06-04"""
 ########################################### MODULES, SETTINGS, AND DEFAULTS ############################################

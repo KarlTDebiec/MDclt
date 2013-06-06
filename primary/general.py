@@ -1,6 +1,6 @@
 #!/usr/bin/python
 desc = """general.py
-    Functions for primary analysis of molecular dynamics trajectories
+    Functions for primary analysis of MD trajectories
     Written by Karl Debiec on 12-11-30
     Last updated 13-06-04"""
 ########################################### MODULES, SETTINGS, AND DEFAULTS ############################################
