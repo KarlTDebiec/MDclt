@@ -2,15 +2,14 @@
 desc = """amber.py
     Functions for primary analysis of AMBER trajectories
     Written by Karl Debiec on 12-12-01
-    Last updated 13-05-12"""
+    Last updated 13-06-04"""
 ########################################### MODULES, SETTINGS, AND DEFAULTS ############################################
 import commands, os, sys
 import numpy as np
 ################################################## ANALYSIS FUNCTIONS ##################################################
-def log(segment, **kwargs):
+def log(segment, time_offset = 0.0, **kwargs):
     """ Parses log for <segment> """
     log         = segment.file_of_type(".out")
-    time_offset = kwargs.get("time_offset", 0.0)
     nstlim      = float(commands.getoutput("grep nstlim " + log).split()[2][:-1])
     ntpr        = float(commands.getoutput("grep ntpr   " + log).split()[2][:-1])
     dt          = float(commands.getoutput("grep dt     " + log).split()[2][:-1])
@@ -50,9 +49,9 @@ def log(segment, **kwargs):
                 i      += 1
         i  += 1
     data["TIME(PS)"]    = np.array(data["TIME(PS)"])[:-2]  / 1000. + time_offset
-    dtype_line      = "np.dtype([('time', 'f'),"
+    dtype_line      = "np.dtype([('time', 'f4'),"
     log_line        = "[tuple(frame) for frame in np.column_stack((data['TIME(PS)'],"
-    attrs_line      = "{'time': 'ns',"
+    attrs_line      = "{'time units': 'ns',"
     for field, dest in [("Etot",        "total"),
                         ("EPtot",       "potential"),
                         ("EKtot",       "kinetic"),
@@ -67,19 +66,19 @@ def log(segment, **kwargs):
                         ("RESTRAINT",   "position restraint")]:
         if not (field in data): continue
         data[field]     = np.array(data[field])[1:-1] * 0.239005736
-        dtype_line     += "('"     + dest  + "', 'f'),"
+        dtype_line     += "('"     + dest  + "', 'f4'),"
         log_line       += "data['" + field + "'],"
-        attrs_line     += "'"      + dest  + "': 'kcal mol-1',"
+        attrs_line     += "'"      + dest  + " units': 'kcal mol-1',"
     if "TEMP(K)" in data:
         data["TEMP(K)"] = np.array(data["TEMP(K)"])[1:-1]
-        dtype_line     += "('temperature', 'f'),"
+        dtype_line     += "('temperature', 'f4'),"
         log_line       += "data['TEMP(K)'],"
-        attrs_line     += "'temperature': 'K',"
+        attrs_line     += "'temperature units': 'K',"
     if "PRESS" in data:
         data["PRESS"]   = np.array(data["PRESS"])[1:-1]
-        dtype_line     += "('pressure', 'f'),"
+        dtype_line     += "('pressure', 'f4'),"
         log_line       += "data['PRESS'],"
-        attrs_line     += "'pressure': 'bar',"
+        attrs_line     += "'pressure units': 'bar',"
     dtype_line  = dtype_line[:-1]   + "])"
     log_line    = log_line[:-1]     + "))]"
     attrs_line  = attrs_line[:-1]   + "}"
@@ -88,6 +87,7 @@ def log(segment, **kwargs):
     return [(segment + "/log",    log),
             (segment + "/",       seg_attrs),
             (segment + "/log",    log_attrs)]
-def _check_log(hdf5_file, segment, **kwargs):
-    if not (segment + "/log" in hdf5_file): return [(log, segment, kwargs)]
-    else:                                   return False
+def _check_log(hdf5_file, segment, force = False, **kwargs):
+    if    (force 
+    or not segment + "/log" in hdf5_file): return [(log, segment, kwargs)]
+    else:                                  return False

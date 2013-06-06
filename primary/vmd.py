@@ -2,17 +2,14 @@
 desc = """vmd.py
     Functions for primary analysis of molecular dynamics trajectories using vmd
     Written by Karl Debiec on 13-03-06
-    Last updated 13-05-12"""
+    Last updated 13-06-04"""
 ########################################### MODULES, SETTINGS, AND DEFAULTS ############################################
 import os, sys
 import numpy as np
 from   standard_functions import _shell_executor
 ################################################## ANALYSIS FUNCTIONS ##################################################
-def rmsd(segment, **kwargs):
+def rmsd(segment, reference, vmd = "vmd", domain = "", selection = "protein and name CA", **kwargs):
     """ Calculates rmsd of <domain> relative to <reference> with <selection> using <vmd> """
-    vmd         = kwargs.get("vmd",       "vmd")
-    domain      = kwargs.get("domain",    "")
-    selection   = kwargs.get("selection", "protein and name CA")
     reference   = kwargs.get("reference")
     script      = "/".join(os.path.abspath(__file__).split("/")[:-2] + ["tcl", "vmd_rmsd.tcl"])
     command     = "{0} -dispdev text -e {1} -args {2} {3} {4} \"{5}\"".format(vmd, script, segment.topology,
@@ -32,9 +29,9 @@ def rmsd(segment, **kwargs):
              (segment + "/rotmat_" + domain,  rotmat),
              (segment + "/rmsd_"   + domain,  {"selection": selection, "method": "vmd", "units": "A"}),
              (segment + "/rotmat_" + domain,  {"selection": selection, "method": "vmd"})]
-def _check_rmsd(hdf5_file, segment, **kwargs):
-    domain  = kwargs.get("domain",    "")
-    if not ([segment + "/rmsd_"   + domain,
-             segment + "/rotmat_" + domain] in hdf5_file):
-            return [(rmsd, segment, kwargs)]
-    else:   return False
+def _check_rmsd(hdf5_file, segment, force = False, **kwargs):
+    domain  = kwargs.get("domain", "")
+    if (force
+    or  not ([segment + "/rmsd_"   + domain,
+              segment + "/rotmat_" + domain] in hdf5_file): return [(rmsd, segment, kwargs)]
+    else:                                                   return False

@@ -31,9 +31,11 @@ def _primary_make_task_list(hdf5_file, segments, analyses):
 
 def _primary_complete_tasks(hdf5_file, task_list, n_cores = 1):
     pool    = Pool(n_cores)
-    for result in pool.imap_unordered(_primary_pool_director, task_list):
-        if  not result:             continue
-        for path, data in result:   hdf5_file.add(path, data)
+    for results in pool.imap_unordered(_primary_pool_director, task_list):
+        if not results: continue
+        for result in results:
+            if   len(result)  == 2: hdf5_file.add(result[0], result[1])
+            else:                   hdf5_file.add(result[0], result[1], **result[2])
     pool.close()
     pool.join()
 
@@ -42,15 +44,15 @@ def _primary_pool_director(task):
     return function(segment, **kwargs)
 
 def analyze_primary(hdf5_filename, path, segment_lister, analyses, n_cores = 1):
-    """ Performs primary analysis (analysis of trajectory directly)
+    """ Performs primary analysis (analysis of trajectories directly)
         1) Builds list of trajectory segments at <path> using function <segment_lister>
-        2) Builds task list based on requested <analyses>, data present in <hdf5_filename>, and segments at <path>
+        2) Builds task list based on requested <analyses>, data present in <hdf5_filename>, and listed segments
         3) Distributes tasks across <n_cores> and writes results to <hdf5_filename> """
     print "Analyzing trajectory at {0}".format(path.replace("//","/"))
     for module in set([m.split(".")[0] for m in [a[0] for a in analyses]]): import_module("primary." + module)
-    if   type(segment_lister) == types.FunctionType:
+    if   isinstance(segment_lister, types.FunctionType):
         segments    = segment_lister(path)
-    elif type(segment_lister) == types.StringType:
+    elif isinstance(segment_lister, types.StringTypes):
         import_module(segment_lister.split(".")[0])
         segments        = _string_to_function(segment_lister)(path)
     else:
@@ -72,16 +74,18 @@ def _secondary_make_task_list(hdf5_file, analyses):
 
 def _secondary_complete_tasks(hdf5_file, task_list, n_cores = 1):
     for function, kwargs in task_list:
-        results = function(hdf5_file, n_cores, **kwargs)
+        kwargs["n_cores"]   = n_cores
+        results = function(hdf5_file, **kwargs)
         if  not results:            continue
         for result in results:
-            if len(result)  == 2:   hdf5_file.add(result[0], result[1], **kwargs)
+            if   len(result)  == 2: hdf5_file.add(result[0], result[1], **kwargs)
             else:                   hdf5_file.add(result[0], result[1], **result[2])
 
 def analyze_secondary(hdf5_filename, analyses, n_cores = 1):
     """ Performs secondary analysis (analysis of primary analysis)
-        1) Builds task list based on <analyses>, loads required data from <hdf5_filename>
-        2) Completes tasks in serial, using <n_cores> for each task if implemented, and saves results to <hdf5_file>"""
+        1) Builds task list based on <analyses>, concurrently loads required data from <hdf5_filename>
+        2) Completes tasks in serial, using <n_cores> for each task (if implemented), and writes results to
+           <hdf5_filename>"""
     print "Analyzing file {0}".format(hdf5_filename.replace("//","/"))
     for module in set([m.split(".")[0] for m in [a[0] for a in analyses]]): import_module("secondary." + module)
     with HDF5_File(hdf5_filename) as hdf5_file:

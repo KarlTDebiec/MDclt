@@ -67,14 +67,14 @@ def _contact_1D_to_2D_map(contact_1D):
     """ Converts a 1D (sparse) contact map <contact_1D> to a 2D (complete) contact map """
     n_res       = int(1 + np.sqrt(1 + 8 * contact_1D.size)) / 2
     indexes     = contact_1D_to_2D_indexes(n_res)
-    contact_2D  = np.zeros((n_res, n_res), dtype = np.int8)
+    contact_2D  = np.zeros((n_res, n_res), np.int8)
     contact_2D[indexes[:,0], indexes[:,1]]  = contact_1D
     contact_2D[indexes[:,1], indexes[:,0]]  = contact_1D
     contact_2D[range(n_res), range(n_res)]  = 1
     return contact_2D
 def _contact_2D_to_1D_indexes(n_res):
     """ Generates indexes for conversion of 2D (complete) contact map to a 1D (sparse) contact map of <n_res> """
-    indexes = np.zeros((n_res,n_res), dtype = np.int)
+    indexes = np.zeros((n_res,n_res), np.int)
     i       = 0
     for j in range(n_res-1):
         for k in range(j+1,n_res):
@@ -83,7 +83,7 @@ def _contact_2D_to_1D_indexes(n_res):
     return indexes
 def _contact_1D_to_2D_indexes(n_res):
     """ Generates indexes for conversion of 1D (sparse) contact map to a 2D (complete) contact map of <n_res> """
-    indexes = np.zeros(((n_res**2-n_res)/2,2), dtype = np.int)
+    indexes = np.zeros(((n_res**2-n_res)/2,2), np.int)
     i       = 0
     for j in range(n_res-1):
         for k in range(j+1,n_res):

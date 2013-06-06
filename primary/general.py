@@ -2,7 +2,7 @@
 desc = """general.py
     Functions for primary analysis of molecular dynamics trajectories
     Written by Karl Debiec on 12-11-30
-    Last updated 13-05-11"""
+    Last updated 13-06-04"""
 ########################################### MODULES, SETTINGS, AND DEFAULTS ############################################
 import os, sys
 import numpy as np
@@ -13,31 +13,27 @@ import trajectory_cython
 from   cython_functions   import _cy_contact
 from   standard_functions import is_num, _contact_2D_to_1D_indexes
 ################################################## ANALYSIS FUNCTIONS ##################################################
-def com(segment, **kwargs):
+def com(segment, domain = "", selection = "protein", **kwargs):
     """ Calculates center of mass of <domain> with <selection> """
-    domain      = kwargs.get("domain",      "")
-    selection   = kwargs.get("selection",   "protein")
-    trj         = md.Universe(segment.topology, segment.trajectory)
-    com         = np.zeros((len(trj.trajectory), 3), dtype = np.float32)
-    trj_sel     = trj.selectAtoms(selection)
+    trj     = md.Universe(segment.topology, segment.trajectory)
+    com     = np.zeros((len(trj.trajectory), 3), np.float32)
+    trj_sel = trj.selectAtoms(selection)
     for i, frame in enumerate(trj.trajectory):
         com[i]  = trj_sel.centerOfMass()
     return  [(segment + "/com_" + domain, com),
              (segment + "/com_" + domain, {"selection": selection, "method": "mdanalysis", "units": "A"})]
-def _check_com(hdf5_file, segment, **kwargs):
-    domain  = kwargs.get("domain",    "")
-    if not (segment + "/com_" + domain in hdf5_file):   return [(com, segment, kwargs)]
-    else:                                               return False
+def _check_com(hdf5_file, segment, force = False, **kwargs):
+    domain  = kwargs.get("domain", "")
+    if    (force
+    or not segment + "/com_" + domain in hdf5_file): return [(com, segment, kwargs)]
+    else:                                            return False
 
-def rmsd(segment, **kwargs):
+def rmsd(segment, reference, domain = "", selection = "protein and name CA", **kwargs):
     """ Calculates rmsd of <domain> relative to <reference> with <selection> """
-    domain      = kwargs.get("domain",    "")
-    selection   = kwargs.get("selection", "protein and name CA")
-    reference   = kwargs.get("reference")
     ref         = md.Universe(reference)
     trj         = md.Universe(segment.topology, segment.trajectory)
-    rmsd        = np.zeros(len(trj.trajectory),      dtype = np.float32)
-    rotmat      = np.zeros((len(trj.trajectory), 9), dtype = np.float64)
+    rmsd        = np.zeros(len(trj.trajectory),      np.float32)
+    rotmat      = np.zeros((len(trj.trajectory), 9), np.float64)
     ref_sel     = ref.selectAtoms(selection)
     trj_sel     = trj.selectAtoms(selection)
     n_atoms     = trj_sel.numberOfAtoms()
@@ -46,33 +42,33 @@ def rmsd(segment, **kwargs):
         trj_frame   = (trj_sel.coordinates() - trj_sel.centerOfMass()).T.astype("float64")
         rmsd[i]     = mdaa.qcp.CalcRMSDRotationalMatrix(ref_frame, trj_frame, n_atoms, rotmat[i], None)
     return  [(segment + "/rmsd_"   + domain,  rmsd),
-             (segment + "/rotmat_" + domain,  np.array(rotmat, dtype = np.float32)),
+             (segment + "/rotmat_" + domain,  np.array(rotmat, np.float32)),
              (segment + "/rmsd_"   + domain,  {"selection": selection, "method": "mdanalysis", "units": "A"}),
              (segment + "/rotmat_" + domain,  {"selection": selection, "method": "mdanalysis"})]
-def _check_rmsd(hdf5_file, segment, **kwargs):
+def _check_rmsd(hdf5_file, segment, force = False, **kwargs):
     domain  = kwargs.get("domain",    "")
-    if not ([segment + "/rmsd_"   + domain,
-             segment + "/rotmat_" + domain] in hdf5_file):
-            return [(rmsd, segment, kwargs)]
-    else:   return False
+    if    (force
+    or not [segment + "/rmsd_"   + domain,
+            segment + "/rotmat_" + domain] in hdf5_file): return [(rmsd, segment, kwargs)]
+    else:                                                 return False
 
-def contact(segment, **kwargs):
+def contact(segment, res_sel = "(protein or resname ACE)", atom_sel = "(name C* or name N* or name O* or name S*)",
+            **kwargs):
     """ Calculates inter-residue contacts, defined as heavy-atom minimum distance within 5.5 Angstrom """
-    res_selection   = kwargs.get("res_selection",  "(protein or resname ACE)")
-    atom_selection  = kwargs.get("atom_selection", "(name C* or name N* or name O* or name S*)")
     trj             = md.Universe(segment.topology, segment.trajectory)
-    trj_sel         = trj.selectAtoms(res_selection + " and " + atom_selection)
+    trj_sel         = trj.selectAtoms(res_sel + " and " + atom_sel)
     n_res           = len(trj_sel.residues)
     atomcounts      = np.array([len(R.selectAtoms(atom_selection)) for R in trj_sel.residues])
     atomcounts      = np.array([(np.sum(atomcounts[:i]), np.sum(atomcounts[:i]) + n) for i, n in enumerate(atomcounts)])
-    contacts        = np.zeros((len(trj.trajectory), (n_res ** 2 - n_res) / 2), dtype = np.int8)
+    contacts        = np.zeros((len(trj.trajectory), (n_res ** 2 - n_res) / 2), np.int8)
     indexes         = _contact_2D_to_1D_indexes(n_res)
     for frame_i, frame in enumerate(trj.trajectory):
         contacts[frame_i]   = _cy_contact(trj_sel.coordinates().T.astype("float64"), atomcounts, indexes)
     return  [(segment + "/contact",  contacts)]
-def _check_contact(hdf5_file, segment, **kwargs):
-    if not (segment + "/contact" in hdf5_file): return [(contact, segment, kwargs)]
-    else:                                       return False
+def _check_contact(hdf5_file, segment, force = False, **kwargs):
+    if    (force
+    or not segment + "/contact" in hdf5_file): return [(contact, segment, kwargs)]
+    else:                                      return False
 
 #def mindist(arguments):
 #    segment, topology, trajectory, name, group_1, group_2 = arguments

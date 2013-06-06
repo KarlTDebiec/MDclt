@@ -2,16 +2,15 @@
 desc = """gromacs.py
     Functions for primary analysis of GROMACS trajectories
     Written by Karl Debiec on 12-11-30
-    Last updated 13-05-12"""
+    Last updated 13-06-04"""
 ########################################### MODULES, SETTINGS, AND DEFAULTS ############################################
 import commands, os, sys
 import numpy as np
 from   standard_functions import is_num, month
 ################################################## ANALYSIS FUNCTIONS ##################################################
-def log(segment, **kwargs):
+def log(segment, time_offset = 0.0, **kwargs):
     """ Parses log for <segment> """
     log         = segment.file_of_type(".log")
-    time_offset = kwargs.get("time_offset", 0.0)
     nsteps      = float(commands.getoutput("grep nsteps " + log).split()[2])
     nstlog      = float(commands.getoutput("grep nstlog " + log).split()[2])
     length      = nsteps / nstlog
@@ -62,9 +61,9 @@ def log(segment, **kwargs):
                 i      += 2
         i  += 1
     data["Time"]    = np.array(data["Time"])[1:]  / 1000. + time_offset
-    dtype_line      = "np.dtype([('time', 'f'),"
+    dtype_line      = "np.dtype([('time', 'f4'),"
     log_line        = "[tuple(frame) for frame in np.column_stack((data['Time'],"
-    attrs_line      = "{'time': 'ns',"
+    attrs_line      = "{'time units': 'ns',"
     for field, dest in [("Total Energy",     "total"),
                         ("Potential",        "potential"),
                         ("Kinetic En.",      "kinetic"),
@@ -86,24 +85,24 @@ def log(segment, **kwargs):
                         ("Position Rest.",   "position restraint")]: 
         if not (field in data): continue
         data[field]             = np.array(data[field])[1:-1] * 0.239005736     # Convert from kJ to kcal
-        dtype_line             += "('"     + dest  + "','f'),"
+        dtype_line             += "('"     + dest  + "','f4'),"
         log_line               += "data['" + field + "'],"
-        attrs_line             += "'"      + dest  + "':'kcal mol-1',"
+        attrs_line             += "'"      + dest  + " units':'kcal mol-1',"
     if "Temperature" in data:
         data["Temperature"]     = np.array(data["Temperature"])[1:-1]
-        dtype_line             += "('temperature','f'),"
+        dtype_line             += "('temperature','f4'),"
         log_line               += "data['Temperature'],"
-        attrs_line             += "'temperature':'K',"
+        attrs_line             += "'temperature units':'K',"
     if "Pressure (bar)" in data:
         data["Pressure (bar)"]  = np.array(data["Pressure (bar)"])[1:-1]
-        dtype_line             += "('pressure','f'),"
+        dtype_line             += "('pressure','f4'),"
         log_line               += "data['Pressure (bar)'],"
-        attrs_line             += "'pressure':'bar',"
+        attrs_line             += "'pressure units':'bar',"
     if "Pres. DC (bar)" in data:
         data["Pres. DC (bar)"]  = np.array(data["Pres. DC (bar)"])[1:-1]
-        dtype_line             += "('pressure dispersion correction','f'),"
+        dtype_line             += "('pressure dispersion correction','f4'),"
         log_line               += "data['Pres. DC (bar)'],"
-        attrs_line             += "'pressure dispersion correction':'bar',"
+        attrs_line             += "'pressure dispersion correction units':'bar',"
     dtype_line  = dtype_line[:-1]   + "])"
     log_line    = log_line[:-1]     + "))]"
     attrs_line  = attrs_line[:-1]   + "}"
@@ -112,8 +111,9 @@ def log(segment, **kwargs):
     return  [(segment + "/log",   log),
              (segment + "/",      seg_attrs),
              (segment + "/log",   log_attrs)]
-def _check_log(hdf5_file, segment, **kwargs):
-    if not (segment + "/log" in hdf5_file):
+def _check_log(hdf5_file, segment, force = False, **kwargs):
+    if    (force
+    or not segment + "/log" in hdf5_file):
             kwargs["time_offset"] = float(segment)
             return [(log, segment, kwargs)]
     else:   return False
