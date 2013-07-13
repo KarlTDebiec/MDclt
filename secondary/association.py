@@ -2,7 +2,7 @@
 desc = """association.py
     Functions for secondary analysis of molecular association
     Written by Karl Debiec on 12-08-15
-    Last updated 13-06-06"""
+    Last updated 13-07-12"""
 ########################################### MODULES, SETTINGS, AND DEFAULTS ############################################
 import os, sys, warnings
 import numpy as np
@@ -48,30 +48,32 @@ def _load_association(self, path, **kwargs):
         i                      += shapes[j,0]
     return data
 def _load_association_pmf(self, path, bins, **kwargs):
-    segments                    = self._segments()
-    data                        = np.zeros(bins.size - 1, np.int32)
+    segments        = self._segments()
+    data            = np.zeros(bins.size - 1, np.int32)
     for segment in segments:
         hist, _     = np.histogram(self[segment + "/" + path[2:]], bins)
         data       += hist
     return data
 ################################################## ANALYSIS FUNCTIONS ##################################################
-def two_state(hdf5_file, verbose = False, n_cores = 1, **kwargs):
+def two_state(hdf5_file,
+              volume,                                       # System volume
+              primary       = "comdist",                    # Primary dataset; path is '*/association_<primary>'
+              cutoff        = 4.5,                          # Bound/unbound cutoff (A)
+              n_molecule_1  = 1,                            # Number of molecules of type 1
+              n_molecule_2  = 1,                            # Number of molecules of type 2
+              verbose       = False, n_cores = 1, **kwargs):
     """ Calculates Ka, kon, and koff of <n_molecule_1> molecules of type 1 and <n_molecule_2> molecules of type 2 in a
         cubic box of <side length> with the bound state defined as distance measurment <primary> below <cutoff> 
         Angstrom. Follows the protocol of Piana, S., Lindorff-Larsen, K., Shaw, D.E. How Robust Are Protein Folding
         Simulations with Respect to Force Field Parameterization? Biophys J. 2011. 100. L47-L49. Error is estimated
         using the blocking method of Flyvbjerg, H., and Petersen, H. G. Error Estimates on Averages of Correlated Data.
         J Phys Chem. 1989. 91. 461-466. """
-    primary         = kwargs.get("primary",     "comdist")  # Primary dataset; path is '*/association_<primary>'
-    cutoff          = kwargs.get("cutoff",      4.5)        # Bound/unbound cutoff (A)
-    n_mol1          = kwargs.get("n_molecule_1", 1)         # Number of molecules of type 1
-    n_mol2          = kwargs.get("n_molecule_2", 1)         # Number of molecules of type 2
-    volume          = kwargs.get("volume")      * 1e-27     # System volume (A^3 > L)
+    volume         *= 1e-27                                 # (A^3 > L)
     time            = hdf5_file.data["*/log"]["time"]
     distance        = hdf5_file.data["*/association_" + primary]
     dt              = time[1] - time[0]
-    C_mol1_total    = _concentration(n_mol1, volume)
-    C_mol2_total    = _concentration(n_mol2, volume)
+    C_mol1_total    = _concentration(n_molecule_1, volume)
+    C_mol2_total    = _concentration(n_molecule_2, volume)
 
     bound                       = np.zeros(distance.shape, np.float32)
     bound[distance < cutoff]    = 1
@@ -80,10 +82,10 @@ def two_state(hdf5_file, verbose = False, n_cores = 1, **kwargs):
     P_bound[0]                  = total_bound[0]
     for i in range(1, time.size):
         P_bound[i]              = (P_bound[i-1] + total_bound[i])
-    P_bound                    /= np.arange(n_mol1, bound.size + 1, n_mol1)
+    P_bound                    /= np.arange(n_molecule_1, bound.size + 1, n_molecule_1)
     Ka                          = _P_bound_to_Ka(P_bound, C_mol1_total, C_mol2_total)
 
-    block_size, Pbound_se       = _block(total_bound / n_mol1)
+    block_size, Pbound_se       = _block(total_bound / n_molecule_1)
     min_asym, max_asym, poi, k, Pbound_se_fit   = _fit_sigmoid(block_size, Pbound_se)
     block_duration              = np.array(block_size, np.float32) * dt
     poi                        *= dt
@@ -91,7 +93,7 @@ def two_state(hdf5_file, verbose = False, n_cores = 1, **kwargs):
 
     fpt_on      = []
     fpt_off     = []
-    for i in range(n_mol1):
+    for i in range(n_molecule_1):
         transitions =  bound[:-1,i] - bound[1:,i]
         ons         =  time[np.where(transitions == -1)[0] + 1]
         offs        =  time[np.where(transitions ==  1)[0] + 1]
@@ -133,15 +135,7 @@ def two_state(hdf5_file, verbose = False, n_cores = 1, **kwargs):
                        "Ka units": "M-1",  "kon units": "M-2 ns-1", "koff units": "M-1 ns-1"}
 
     if verbose:
-        print "DURATION {0:5d} ns CUTOFF {1} < {2:3.1f} A".format(int(attrs["time"]), primary.upper(), attrs["cutoff"])
-        print "Ka          {0:>6.3f} M-1     ".format(Pbound_attrs["Ka"])
-        print "Ka       se {0:>6.3f} M-1     ".format(Pbound_attrs["Ka se"])
-        print "kon         {0:>6.0f} M-2 ns-1".format(fpt_attrs["kon"])
-        print "kon      se {0:>6.0f} M-2 ns-1".format(fpt_attrs["kon se"])
-        print "koff        {0:>6.0f} M-1 ns-1".format(fpt_attrs["koff"])
-        print "koff     se {0:>6.0f} M-1 ns-1".format(fpt_attrs["koff se"])
-        print "kon/koff    {0:>6.3f} M-1     ".format(fpt_attrs["Ka"])
-        print "kon/koff se {0:>6.3f} M-1     ".format(fpt_attrs["Ka se"])
+        _print_two_state(primary.upper(), attrs, Pbound_attrs, fpt_attrs)
     return  [("association/" + primary + "/Pbound/Ka",      Ka),
              ("association/" + primary + "/Pbound/Ka",      {"time units": "ns", "Ka units": "M-1"}),
              ("association/" + primary + "/Pbound/block",   block),
@@ -179,33 +173,37 @@ def _check_two_state(hdf5_file, force = False, **kwargs):
     elif verbose:
         Pbound_attrs    = hdf5_file.attrs("association/" + primary + "/Pbound")
         fpt_attrs       = hdf5_file.attrs("association/" + primary + "/fpt")
-        print "DURATION {0:5d} ns CUTOFF {1} < {2:3.1f} A".format(int(attrs["time"]), primary.upper(), attrs["cutoff"])
-        print "Ka          {0:>6.3f} M-1     ".format(Pbound_attrs["Ka"])
-        print "Ka       se {0:>6.3f} M-1     ".format(Pbound_attrs["Ka se"])
-        print "kon         {0:>6.0f} M-2 ns-1".format(fpt_attrs["kon"])
-        print "kon      se {0:>6.0f} M-2 ns-1".format(fpt_attrs["kon se"])
-        print "koff        {0:>6.0f} M-1 ns-1".format(fpt_attrs["koff"])
-        print "koff     se {0:>6.0f} M-1 ns-1".format(fpt_attrs["koff se"])
-        print "kon/koff    {0:>6.3f} M-1     ".format(fpt_attrs["Ka"])
-        print "kon/koff se {0:>6.3f} M-1     ".format(fpt_attrs["Ka se"])
+        _print_two_state(primary.upper(), attrs, Pbound_attrs, fpt_attrs)
     return False
+def _print_two_state(pcoord, attrs, Pbound_attrs, fpt_attrs):
+    print "DURATION {0:5d} ns CUTOFF {1} < {2:3.1f} A".format(int(attrs["time"]), pcoord, attrs["cutoff"])
+    print "Ka          {0:>6.3f} M-1     ".format(Pbound_attrs["Ka"])
+    print "Ka       se {0:>6.3f} M-1     ".format(Pbound_attrs["Ka se"])
+    print "kon         {0:>6.0f} M-2 ns-1".format(fpt_attrs["kon"])
+    print "kon      se {0:>6.0f} M-2 ns-1".format(fpt_attrs["kon se"])
+    print "koff        {0:>6.0f} M-1 ns-1".format(fpt_attrs["koff"])
+    print "koff     se {0:>6.0f} M-1 ns-1".format(fpt_attrs["koff se"])
+    print "kon/koff    {0:>6.3f} M-1     ".format(fpt_attrs["Ka"])
+    print "kon/koff se {0:>6.3f} M-1     ".format(fpt_attrs["Ka se"])
 
-def pmf(hdf5_file, verbose = False, n_cores = 1, **kwargs):
-    """  """
-    primary     = kwargs.get("primary",     "comdist")
-    bins        = kwargs.get("bins",        np.linspace(0.0, 10.0, 11))
-    boltzmann   = kwargs.get("boltzmann",   0.0019872041)
-    temperature = kwargs.get("temperature", 298.0)
-    zero_point  = kwargs.get("zero_point",  None)
 
-    time        = hdf5_file.data["*/log"]["time"]
-    count       = hdf5_file.data["*/association_" + primary]
+def pmf(hdf5_file, 
+        pcoord      = "comdist",                            # Progress coordinate
+        bins        = np.linspace(0.0, 10.0, 11),           # Bins
+        boltzmann   = 0.0019872041,                         # Boltzmann's constat
+        temperature = 298.0,                                # System temperature
+        zero_point  = None,                                 # Point at which to zero energy
+        verbose     = False, n_cores = 1, **kwargs):
+    """ Calculates potential of mean force along <pcoord> by splitting into <bins> and using <boltzmann> and
+        <temperature>. Sets energy to zero at <zero point> """
+    time            = hdf5_file.data["*/log"]["time"]
+    count           = hdf5_file.data["*/association_" + pcoord + "_pmf"]
 
     centers         = (bins[:-1] + bins[1:]) / 2.0
     P               = np.array(count, dtype = np.float32) / np.sum(count)
     P[P == 0.0]     = np.nan
-    P_adjusted      = P / (centers ** 2.0)
-    P_adjusted     /= np.nansum(P_adjusted)
+    P_adjusted      = P / (centers ** 2.0)                  # Adjust by r^2
+    P_adjusted     /= np.nansum(P_adjusted)                 # Normalize
     pmf_final       = np.log(P_adjusted) * -1 * boltzmann * temperature
     if zero_point:
         pmf_final  -= pmf_final[np.abs(centers - zero_point).argmin()]
@@ -215,34 +213,38 @@ def pmf(hdf5_file, verbose = False, n_cores = 1, **kwargs):
                                   ("probability", "f4"), ("adjusted probability", "f4"), ("pmf",   "f4")]))
     pmf_attrs       = {"lower bound units": "A", "upper bound units": "A", "pmf units": "kcal mol-1",
                        "boltzmann": boltzmann, "temperature": temperature, "zero point": zero_point, "time": time[-1]}
-    return  [("association/" + primary + "/pmf",    pmf_data),
-             ("association/" + primary + "/pmf",    pmf_attrs)]
+    if verbose:
+        print "DURATION {0:5d} ns".format(int(pmf_attrs["time"]))
+    return  [("association/" + pcoord + "/pmf", pmf_data),
+             ("association/" + pcoord + "/pmf", pmf_attrs)]
 def _check_pmf(hdf5_file, force = False, **kwargs):
-    primary     = kwargs.get("primary",     "comdist")
+    pcoord      = kwargs.get("pcoord",      "comdist")
     bins        = kwargs.get("bins",        np.linspace(0.0, 10.0, 11))
     boltzmann   = kwargs.get("boltzmann",   0.0019872041)
     temperature = kwargs.get("temperature", 298.0)
     zero_point  = kwargs.get("zero_point",  None)
     verbose     = kwargs.get("verbose",     False)
-    expected    = "association/" + primary + "/pmf"
+    expected    = "association/" + pcoord + "/pmf"
 
     hdf5_file.load("*/log", type = "table")
     if     (force
     or not (expected in hdf5_file)):
-        hdf5_file.load("*/association_" + primary, loader = _load_association_pmf, bins = bins)
+        hdf5_file.load("*/association_" + pcoord, destination = "*/association_" + pcoord + "_pmf",
+          loader = _load_association_pmf, bins = bins)
         return [(pmf, kwargs)]
 
-    attrs       = hdf5_file.attrs(expected)
     pmf_data    = hdf5_file[expected]
-    if (boltzmann                               != attrs["boltzmann"]
-    or (temperature                             != attrs["temperature"])
-    or (zero_point                              != attrs["zero point"])
+    pmf_attrs   = hdf5_file.attrs(expected)
+    if (boltzmann                               != pmf_attrs["boltzmann"]
+    or (temperature                             != pmf_attrs["temperature"])
+    or (zero_point                              != pmf_attrs["zero point"])
     or (bins.size                               != pmf_data["lower bound"].size + 1)
     or (np.any(np.array(bins[:-1], np.float32)  != pmf_data["lower bound"]))
     or (np.any(np.array(bins[1:],  np.float32)  != pmf_data["upper bound"]))
-    or (hdf5_file.data["*/log"]["time"][-1]     != attrs["time"])):
-        hdf5_file.load("*/association_" + primary, loader = _load_association_pmf, bins = bins)
+    or (hdf5_file.data["*/log"]["time"][-1]     != pmf_attrs["time"])):
+        hdf5_file.load("*/association_" + pcoord, destination = "*/association_" + pcoord + "_pmf",
+          loader = _load_association_pmf, bins = bins)
         return [(pmf, kwargs)]
     elif verbose:
-        print "DURATION {0:5d} ns".format(int(attrs["time"]))
+        print "DURATION {0:5d} ns".format(int(pmf_attrs["time"]))
     return False

@@ -2,7 +2,7 @@
 desc = """anton.py
     Functions for primary analysis of ANTON trajectories
     Written by Karl Debiec on 12-11-29
-    Last updated 13-06-04"""
+    Last updated 13-06-06"""
 ########################################### MODULES, SETTINGS, AND DEFAULTS ############################################
 import commands, os, sys
 import numpy as np

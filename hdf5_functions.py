@@ -2,7 +2,7 @@
 desc = """hdf5_functions.py
     Class for simplifying interaction with HDF5 files
     Written by Karl Debiec on 13-02-03
-    Last updated 13-06-06"""
+    Last updated 13-07-12"""
 ########################################### MODULES, SETTINGS, AND DEFAULTS ############################################
 import commands, os, sys
 import h5py
@@ -94,14 +94,15 @@ class HDF5_File:
             group.create_dataset(name, data = data, **data_kwargs)
             if verbose:
                 print "    {0:25} added".format("/".join(path + [name]))
-    def load(self, path, type = "array", **kwargs):
-        if not self.file: self._open_file()
+    def load(self, path, destination = None, type = "array", **kwargs):
+        if not destination: destination  = path
+        if not self.file:   self._open_file()
         if   "loader" in kwargs:                       loader = Function_to_Method_Wrapper(self, kwargs.get("loader"))
         elif type == "array" and path.startswith("*"): loader = self._load_split_array
         elif type == "array":                          loader = self._load_whole_array
         elif type == "table" and path.startswith("*"): loader = self._load_split_table
         elif type == "table":                          loader = self._load_whole_table
-        self.data[path] = loader(self._strip_path(path), **kwargs)
+        self.data[destination]  = loader(self._strip_path(path), **kwargs)
     def attrs(self, path, **kwargs):
         if not self.file: self._open_file()
         return dict(self.hierarchy[self._strip_path(path)].attrs)
