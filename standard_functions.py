@@ -62,6 +62,13 @@ def _shell_executor(command):
     for line in iter(pipe.stdout.readline, ""):
         yield line.rstrip().replace("\n", " ")
     pipe.wait()
+def shell_iterator(command, leader = "", verbose = False, **kwargs):
+    if verbose:     print leader + command
+    pipe    = subprocess.Popen(command, shell = True, stdout = subprocess.PIPE, stderr = subprocess.STDOUT, **kwargs)
+    for line in iter(pipe.stdout.readline, ""):
+        if verbose: print leader + line.rstrip().replace("\n", " ")
+        yield             leader + line.rstrip().replace("\n", " ")
+    pipe.wait()
 ################################################## ANALYSIS FUNCTIONS ##################################################
 def _contact_1D_to_2D_map(contact_1D):
     """ Converts a 1D (sparse) contact map <contact_1D> to a 2D (complete) contact map """
