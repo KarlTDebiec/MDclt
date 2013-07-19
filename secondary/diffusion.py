@@ -2,13 +2,13 @@
 desc = """diffusion.py
     Functions for secondary analysis of diffusion
     Written by Karl Debiec on 13-02-08
-    Last updated 13-06-06"""
+    Last updated 13-07-18"""
 ########################################### MODULES, SETTINGS, AND DEFAULTS ############################################
-import os, sys
+import os, sys, warnings
 import time as time_module
 import numpy as np
 from   multiprocessing   import Pool
-from   scipy.optimize    import fmin
+from   scipy.optimize    import fmin, curve_fit
 from   scipy.integrate   import trapz
 from   cython_functions  import _cy_acf
 ################################################## INTERNAL FUNCTIONS ##################################################
@@ -242,96 +242,84 @@ def _check_rotation(hdf5_file, force = False, **kwargs):
                                                                          100 * rhombicity / control[5])
     return False
 
-def translation(hdf5_file, n_cores = 1, **kwargs):
+def _block(data, function, **kwargs):
+    full_size       = data.size
+    sizes           = np.array(sorted(list(set([full_size / x for x in range(1, full_size)]))), np.int)[:-1]
+    sds             = np.zeros(sizes.size)
+    n_blocks        = full_size // sizes
+    for i, size in enumerate(sizes):
+        resized     = np.resize(data, (full_size // size, size))
+        values      = function(resized, **kwargs)
+        sds[i]      = np.std(values)
+    ses             = sds / np.sqrt(n_blocks)
+    return sizes, ses
+
+def _fit_sigmoid(x, y):
+    def func(x, min_asym, max_asym, poi, k): return max_asym + (min_asym - max_asym) / (1 + (x / poi) ** k)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        min_asym, max_asym, poi, k  = curve_fit(func, x, y, maxfev = 100000)[0]
+    y_fit   = func(x, min_asym, max_asym, poi, k)
+    return min_asym, max_asym, poi, k, y_fit
+
+def translation(hdf5_file,
+                destination     = "",                       # Origin of primary data and destination of secondary data
+                delta_t         = np.array([0.1]),          # Delta_t values to test (ns)
+                selection       = [],                       # Selection names
+                explicit_names  = False,                    # Explicitly name selections in output table
+                control         = np.nan,                   # Control value for comparison (if verbose)
+                verbose         = False, n_cores = 1, **kwargs):
     """ Calculates the translational diffusion coefficient of <domain>
         Follows the protocol of McGuffee, S. R., and Elcock, A. H. PLoS Comp Bio. 2010. e1000694. """
-    domain      = kwargs.get("domain",      "")             # Domain name
-    index_slice = kwargs.get("index_slice", 1)              # Downsample trajectory (use every Nth frame)
-    delta_ts    = kwargs.get("delta_t",     np.array([0.1]))# Delta_t values to test (ns)
-    pbc_cutoff  = kwargs.get("pbc_cutoff",  np.nan)         # Discard points that drift more than this amount; shameful
-                                                            # alternative to properly adjusting for periodic boundary
-                                                            # conditions
-    control     = kwargs.get("control",     np.nan)         # Control value for comparison
-    convergence = kwargs.get("convergence", False)          # Calculate for halves, quarters for convergence
-    verbose     = kwargs.get("verbose",     False)          # Print output to terminal
+    if not destination.startswith("_"):
+        destination = "_" + destination
+    time            = hdf5_file.data["*/log"]["time"]
+    com             = hdf5_file.data["*/com" + destination]
+    size            = time.size
+    dt              = time[1] - time[0]
+    n_selections    = com.shape[1]
+    selection_attr  = " ".join(["\"{0}\"".format(sel) for sel in selection])
+    table           = []
+    dtype_string    = "np.dtype([('delta t', 'f4')"
+    for i, selection in enumerate(selection):
+        if explicit_names:  dtype_string   += ",('{0} D', 'f4'), ('{0} D se', 'f4')".format(selection)
+        else:               dtype_string   += ",('{0} D', 'f4'), ('{0} D se', 'f4')".format(i)
+    dtype_string   += "])"
 
-    time_full   = hdf5_file.data["*/log"]["time"][::index_slice]
-    com_full    = hdf5_file.data["*/com_" + domain][::index_slice]
-    size        = time_full.size
-    dt          = time_full[1] - time_full[0]
+    def calc_D_block(dr_2, delta_t): return  np.mean(dr_2, axis = 1) / (6 * delta_t)
 
-    if index_slice == 1: output_path = "diffusion/translation_{0}/".format(domain)
-    else:                output_path = "diffusion/translation_{0}/slice_{1:d}/".format(domain, int(index_slice))
-    if convergence:      splits      = [("full",      "[:]"),
-                                        ("half/1",    "[:size/2]"),         ("half/2",    "[size/2:]"),
-                                        ("quarter/1", "[:size/4]"),         ("quarter/2", "[size/4:size/2]"),
-                                        ("quarter/3", "[size/2:3*size/4]"), ("quarter/4", "[3*size/4:]")]
-    else:                splits      = [("full",      "[:]")]
+    for delta_t in delta_t:
+        table          += [[delta_t]]
+        delta_t_index   = int(np.round(delta_t / dt))
+        dr_2            = np.sum((com[delta_t_index:] - com[:-delta_t_index]) ** 2, axis = 2)
+        for j in xrange(dr_2.shape[1]):
+            x, y        = _block(dr_2[:,j], calc_D_block, delta_t = delta_t)
+            min_asym, max_asym, poi, k, y_fit   = _fit_sigmoid(x, y)
+            table[-1]  += [np.mean(dr_2[:,j], axis = 0) / (6 * delta_t) / 1000, max_asym / 1000]
+    for i in xrange(len(table)):
+        table[i]        = tuple(table[i])
+    table               = np.array(table, eval(dtype_string))
+    attrs   = {"time": time[-1], "delta t units": "ns", "D units": "A2 ps-1", "selection": selection_attr}
 
-    new_data    = [(output_path + "/delta_t",    delta_ts),
-                   (output_path + "/delta_t",    {"units":      "ns"}),
-                   (output_path,                 {"dt":         dt,
-                                                  "time":       time_full[-1],
-                                                  "pbc_cutoff": pbc_cutoff})]
-    for path, index in splits:
-        time    = eval("time_full{0}".format(index))
-        com     = eval("com_full{0}".format(index))
-        Ds      = np.zeros(delta_ts.size)
-        for i, delta_t in enumerate(delta_ts):
-            delta_t_index   = int(delta_t / dt)
-            dr_2            = np.sum((com[:-delta_t_index] - com[delta_t_index:]) ** 2, axis = 1)
-            if not np.isnan(pbc_cutoff):
-                dr_2        = dr_2[dr_2 < pbc_cutoff]
-            Ds[i]           = np.mean(dr_2) / (6 * delta_t)
-            if verbose:
-                print "DURATION  {0:5d} ns DT   {1:6.3f} ns".format(int(time.size * dt), delta_t)
-                if np.isnan(control):
-                    print "D          {0:4.2f}".format(Ds[i])
-                else:
-                    print "           Control Calc   %"
-                    print "D          {0:4.2f}    {1:4.2f}   {2:3.0f}".format(control, Ds[i], 100 * Ds[i] / control)
-        new_data   += [(output_path + "/" + path + "/D", Ds, kwargs),
-                       (output_path + "/" + path + "/D", {"units": "A2 ns-1",
-                                                          "time":  time.size * dt,})]
-    return new_data
+    return  [("diffusion/translation" + destination, table),
+             ("diffusion/translation" + destination, attrs)]
+
 def _check_translation(hdf5_file, force = False, **kwargs):
-    domain      = kwargs.get("domain",    "")
-    index_slice = kwargs.get("index_slice", 1)
+    destination = kwargs.get("destination", "")
     delta_ts    = kwargs.get("delta_t",     np.array([0.1]))
-    pbc_cutoff  = kwargs.get("pbc_cutoff",  np.nan)
-    control     = kwargs.get("control",     np.nan)
-    convergence = kwargs.get("convergence", False)
     verbose     = kwargs.get("verbose",     False)
+    if not destination.startswith("_"):
+        destination = "_" + destination
 
-    if index_slice == 1: output_path = "diffusion/translation_{0}/".format(domain)
-    else:                output_path = "diffusion/translation_{0}/slice_{1:d}/".format(domain, int(index_slice))
-    if convergence:      splits      = ["full","half/1","half/2","quarter/1","quarter/2","quarter/3","quarter/4"]
-    else:                splits      = ["full"]
-    expected    = [output_path + "/delta_t"]
-    expected   += [output_path + "/" + path + "/D" for path in splits]
+    expected    = ["asdfsdaf"]
 
-    hdf5_file.load("*/log", type = "table")    
-    hdf5_file.load("*/com_" + domain)
+    hdf5_file.load("*/log", type = "table")
+    hdf5_file.load("*/com" + destination)
 
+    selection           = hdf5_file.attrs("0000/com" + destination)["selection"].split("\" \"")
+    selection           = [sel.strip("\"") for sel in selection]
+    kwargs["selection"] = selection
     if (force
     or not(expected in hdf5_file)):
         return [(translation, kwargs)]
-
-    attrs       = hdf5_file.attrs(output_path)
-    if (pbc_cutoff                                         != attrs["pbc_cutoff"]
-    or  hdf5_file.data["*/log"]["time"][::index_slice][-1] != attrs["time"]
-    or  np.all(hdf5_file[output_path + "/delta_t"]         != delta_ts)):
-        return [(translation, kwargs)]
-    elif verbose:
-        for path in expected[1:]:
-            time    = hdf5_file.attrs(path)["time"]
-            for i, delta_t in enumerate(delta_ts):
-                Ds          = hdf5_file[path]
-                duration    = hdf5_file.attrs(path)["time"]
-                print "DURATION  {0:5d} ns DT   {1:6.3f} ns".format(int(duration), delta_t)
-                if np.isnan(control):
-                    print "D          {0:4.2f}".format(Ds[i])
-                else:
-                    print "           Control Calc   %"
-                    print "D          {0:4.2f}    {1:4.2f}   {2:3.0f}".format(control, Ds[i], 100 * Ds[i] / control)
     return False

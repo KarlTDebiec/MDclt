@@ -10,7 +10,7 @@ from   standard_functions import is_num, month
 ################################################## ANALYSIS FUNCTIONS ##################################################
 def log(segment, time_offset = 0.0, **kwargs):
     """ Parses log for <segment> """
-    log         = segment.file_of_type(".log")
+    log         = segment[".log"]
     nsteps      = float(commands.getoutput("grep nsteps " + log).split()[2])
     nstlog      = float(commands.getoutput("grep nstlog " + log).split()[2])
     length      = nsteps / nstlog

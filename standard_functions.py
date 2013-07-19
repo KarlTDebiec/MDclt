@@ -2,13 +2,13 @@
 desc = """standard_functions.py
     Standard functions
     Written by Karl Debiec on 13-02-03
-    Last updated 13-05-12"""
+    Last updated 13-07-18"""
 ########################################### MODULES, SETTINGS, AND DEFAULTS ############################################
 import os, subprocess, sys
 import numpy as np
 ####################################################### CLASSES ########################################################
 class Segment:
-    def __init__(self, number, path, topology, trajectory, files):
+    def __init__(self, number, path, topology = None, trajectory = None, files = None):
         self.number     = number
         self.path       = path
         self.topology   = topology
@@ -19,10 +19,16 @@ class Segment:
     def __repr__(self):         return self.number
     def __add__(self, other):   return str(self.number) + other
     def __radd__(self, other):  return other + str(self.number)
-    def file_of_type(self, end):
-        temp    = [f for f in self.files if f.endswith(end)]
-        if len(temp) == 1:  return temp[0]
-        else:               raise
+    def __getitem__(self, extension):
+        matches = [f for f in self.files if f.endswith(extension)]
+        if   len(matches) == 1:
+            return matches[0]
+        elif len(matches) == 0:
+            raise Exception("No files with extension {0} present\n".format(extension) +
+                            "Files present: {1}".format(self.files))
+        else:
+            raise Exception("Multiple files with extension {0} present\n".format(extension) +
+                            "Files present: {1}".format(self.files))
 class Function_to_Method_Wrapper:
     def __init__(self, host, function):
         self.host       = host
@@ -38,10 +44,14 @@ def segments_standard(sim_root):
     for seg_dir in sorted([f for f in os.listdir(sim_root) if is_num(f)]):
         files       = ["{0}/{1}/{2}".format(sim_root, seg_dir, f)
                         for f in os.listdir("{0}/{1}/".format(sim_root, seg_dir))]
+        topology    = "{0}/{1}/{1}_solute.pdb".format(sim_root, seg_dir)
+        trajectory  = "{0}/{1}/{1}_solute.xtc".format(sim_root, seg_dir)
+        if not os.path.isfile(topology):      topology   = None
+        if not os.path.isfile(trajectory):    trajectory = None
         segments   += [Segment(number       = seg_dir,
                                path         = "{0}/{1}/".format(sim_root, seg_dir),
-                               topology     = "{0}/{1}/{1}_solute.pdb".format(sim_root, seg_dir),
-                               trajectory   = "{0}/{1}/{1}_solute.xtc".format(sim_root, seg_dir),
+                               topology     = topology,
+                               trajectory   = trajectory,
                                files        = files)]
     return segments
 ################################################## GENERAL FUNCTIONS ###################################################

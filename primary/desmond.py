@@ -10,7 +10,7 @@ from   standard_functions import month
 ################################################## ANALYSIS FUNCTIONS ##################################################
 def log(segment, **kwargs):
     """ Parses log for <segment> """
-    log         = segment.file_of_type(".ene")
+    log         = segment[".ene"]
     head        = commands.getoutput("head -n 3 {0}".format(log)).split("\n")[2].split()
     seg_attrs   = {"date": "{0:02d}-{1:02d}-{2:02d}".format(int(head[8][2:]), int(month(head[5])), int(head[6])),
                    "time": head[7]}

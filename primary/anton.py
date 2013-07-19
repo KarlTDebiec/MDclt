@@ -10,7 +10,7 @@ from   standard_functions import month
 ################################################## ANALYSIS FUNCTIONS ##################################################
 def log(segment, **kwargs):
     """ Parses log for <segment>; may be either calculated by Anton or generated afterwards using vrun (PENDING)"""
-    log             = segment.file_of_type(".ene")
+    log             = segment[".ene"]
     head            = commands.getoutput("head -n 1 {0}".format(log)).split()
     if "vrun" in head:
         raise Exception("vrun log parsing is not currently implemented")

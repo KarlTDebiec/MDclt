@@ -9,7 +9,7 @@ import numpy as np
 ################################################## ANALYSIS FUNCTIONS ##################################################
 def log(segment, time_offset = 0.0, **kwargs):
     """ Parses log for <segment> """
-    log         = segment.file_of_type(".out")
+    log         = segment[".out"]
     nstlim      = float(commands.getoutput("grep nstlim " + log).split()[2][:-1])
     ntpr        = float(commands.getoutput("grep ntpr   " + log).split()[2][:-1])
     dt          = float(commands.getoutput("grep dt     " + log).split()[2][:-1])
