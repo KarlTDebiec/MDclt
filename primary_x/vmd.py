@@ -2,7 +2,7 @@
 desc = """vmd.py
     Functions for primary cross-segment analysis of MD trajectories using Visual Molecular Dynamics
     Written by Karl Debiec on 13-07-18
-    Last updated 13-07-18"""
+    Last updated 13-07-21"""
 ########################################### MODULES, SETTINGS, AND DEFAULTS ############################################
 import os, sys, types
 import numpy as np
@@ -14,7 +14,7 @@ def com(segments, vmd = "vmd", selection = ["protein and name CA"], destination 
     if isinstance(selection, types.StringType):
         selection   = [selection]
     n_selections    = len(selection)
-    if not destination.startswith("_"):
+    if not (destination == "" or destination.startswith("_")):
         destination = "_" + destination
 
     topology_string         = segments[0].topology
@@ -26,7 +26,6 @@ def com(segments, vmd = "vmd", selection = ["protein and name CA"], destination 
     com                     = None
     attr                    = {"selection": selection_string_attr, "method": "vmd", "units": "A"}
     for line in shell_iterator(command):
-
         if line.startswith("SEGMENT"):
             if com is not None:
                 yield (segments[int(segment_i)] + "/com" + destination, com)
@@ -41,7 +40,7 @@ def com(segments, vmd = "vmd", selection = ["protein and name CA"], destination 
     
 def _check_com(hdf5_file, segments, force = False, **kwargs):
     destination     = kwargs.get("destination", "")
-    if not destination.startswith("_"):
+    if not (destination == "" or destination.startswith("_")):
         destination = "_" + destination
     expected        = [segment + "/com" + destination for segment in segments]
     if (force

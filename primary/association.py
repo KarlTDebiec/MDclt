@@ -28,6 +28,9 @@ def comdist(segment, selection_1, selection_2, mode = "residue", **kwargs):
     return  [(segment + "/association_comdist", comdist),
              (segment + "/association_comdist", {"units": "A"})]
 def _check_comdist(hdf5_file, segment, force = False, **kwargs):
+    if not (segment.topology   and os.path.isfile(segment.topology)
+    and     segment.trajectory and os.path.isfile(segment.trajectory)):
+            return False
     if (force
     or  not (segment + "/association_comdist" in hdf5_file)):
             return [(comdist, segment, kwargs)]
@@ -56,13 +59,15 @@ def mindist(segment, selection_1, selection_2, mode = "residue", **kwargs):
     return  [(segment + "/association_mindist", mindist),
              (segment + "/association_mindist", {"units": "A"})]
 def _check_mindist(hdf5_file, segment, force = False, **kwargs):
+    if not (segment.topology   and os.path.isfile(segment.topology)
+    and     segment.trajectory and os.path.isfile(segment.trajectory)):
+            return False
     if (force
     or  not (segment + "/association_mindist" in hdf5_file)):
             return [(mindist, segment, kwargs)]
     else:   return False
 
-
-
+##################################################### DEPRECIATED ######################################################
 #def salt_bridge(arguments):
 #    """ salt bridge analysis, assumes cubic box and pbc """
 #    segment, topology, trajectory = arguments

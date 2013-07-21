@@ -2,7 +2,7 @@
 desc = """vmd.py
     Functions for primary analysis of MD trajectories using Visual Molecular Dynamics
     Written by Karl Debiec on 13-03-06
-    Last updated 13-07-18"""
+    Last updated 13-07-21"""
 ########################################### MODULES, SETTINGS, AND DEFAULTS ############################################
 import os, sys
 import numpy as np
@@ -29,8 +29,12 @@ def rmsd(segment, reference, vmd = "vmd", domain = "", selection = "protein and 
              (segment + "/rmsd_"   + domain,  {"selection": selection, "method": "vmd", "units": "A"}),
              (segment + "/rotmat_" + domain,  {"selection": selection, "method": "vmd"})]
 def _check_rmsd(hdf5_file, segment, force = False, **kwargs):
+    if not (segment.topology   and os.path.isfile(segment.topology)
+    and     segment.trajectory and os.path.isfile(segment.trajectory)):
+            return False
     domain  = kwargs.get("domain", "")
     if (force
     or  not [segment + "/rmsd_"   + domain,
-             segment + "/rotmat_" + domain] in hdf5_file): return [(rmsd, segment, kwargs)]
-    else:                                                   return False
+             segment + "/rotmat_" + domain] in hdf5_file):
+            return [(rmsd, segment, kwargs)]
+    else:   return False

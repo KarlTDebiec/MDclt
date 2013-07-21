@@ -190,7 +190,7 @@ def _print_two_state(pcoord, attrs, Pbound_attrs, fpt_attrs):
 def pmf(hdf5_file, 
         pcoord      = "comdist",                            # Progress coordinate
         bins        = np.linspace(0.0, 10.0, 11),           # Bins
-        boltzmann   = 0.0019872041,                         # Boltzmann's constat
+        boltzmann   = 0.0019872041,                         # Boltzmann's constant (kcal/mol)
         temperature = 298.0,                                # System temperature
         zero_point  = None,                                 # Point at which to zero energy
         verbose     = False, n_cores = 1, **kwargs):

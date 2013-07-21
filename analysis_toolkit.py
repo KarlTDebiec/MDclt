@@ -39,8 +39,6 @@ def analyze_primary(hdf5_filename, path, segment_lister, analyses, n_cores = 1):
             module, function                    = module_function.split(".")
             check_functions[module_function]    = getattr(sys.modules["primary." + module], "_check_" + function)
         for segment in segments:
-            if not os.path.isfile(segment.topology):    continue
-            if not os.path.isfile(segment.trajectory):  continue
             for module_function, kwargs in analyses:
                 check_function  = check_functions[module_function]
                 new_tasks       = check_function(hdf5_file, segment, **kwargs)

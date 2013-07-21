@@ -2,7 +2,7 @@
 desc = """amber.py
     Functions for primary analysis of AMBER trajectories
     Written by Karl Debiec on 12-12-01
-    Last updated 13-06-04"""
+    Last updated 13-07-21"""
 ########################################### MODULES, SETTINGS, AND DEFAULTS ############################################
 import commands, os, sys
 import numpy as np
@@ -87,7 +87,11 @@ def log(segment, time_offset = 0.0, **kwargs):
     return [(segment + "/log",    log),
             (segment + "/",       seg_attrs),
             (segment + "/log",    log_attrs)]
-def _check_log(hdf5_file, segment, force = False, **kwargs):
-    if    (force 
+def _check_log(hdf5_file, segment, require_trajectory_files = False, force = False, **kwargs):
+    if      (require_trajectory_files
+    and not (segment.topology   and os.path.isfile(segment.topology)
+    and      segment.trajectory and os.path.isfile(segment.trajectory))):
+            return False
+    if    (force
     or not segment + "/log" in hdf5_file): return [(log, segment, kwargs)]
     else:                                  return False

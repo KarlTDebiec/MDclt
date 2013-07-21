@@ -2,7 +2,7 @@
 desc = """energy.py
     Functions for secondary analysis of energy
     Written by Karl Debiec on 13-05-06
-    Last updated 13-06-04"""
+    Last updated 13-07-19"""
 ########################################### MODULES, SETTINGS, AND DEFAULTS ############################################
 import os, sys
 import numpy as np
@@ -20,34 +20,31 @@ def conservation(hdf5_file, verbose = False, n_cores = 1, **kwargs):
                    "temperature slope units": "K ns -1",         "temperature intercept units":  "K",
                    "time":                    time[-1]}
     kwargs["data_kwargs"]   = {"chunks": False}
-    if verbose:
-        print "DURATION  {0:6d} ns".format(int(attrs["time"]))
-        print "          ENERGY                       TEMPERATURE"
-        print "SLOPE     {0:12.4f} kcal mol-1 ns-1 {1:8.4f} K ns-1".format(float(data["energy slope"]),
-                                                                           float(data["temperature slope"]))
-        print "INTERCEPT {0:12.4f} kcal mol-1      {1:8.4f} K".format(float(data["energy intercept"]),
-                                                                      float(data["temperature intercept"]))
-        print "R2        {0:12.4f}                 {1:8.4f}".format(float(data["energy R2"]),
-                                                                    float(data["temperature R2"]))
+    if verbose:     _print_conservation(data, attrs)
     return  [("energy/conservation", data, kwargs),
              ("energy/conservation", attrs)]
 def _check_conservation(hdf5_file, force = False, **kwargs):
     verbose = kwargs.get("verbose",     False)
     hdf5_file.load("*/log", type = "table")
+
     if    (force
     or not "/energy/conservation" in hdf5_file):
         return [(conservation, kwargs)]
+
     attrs   = hdf5_file.attrs("energy/conservation")
     if hdf5_file.data["*/log"]["time"][-1] != attrs["time"]:
         return [(conservation, kwargs)]
     elif verbose:
         data    = hdf5_file["energy/conservation"]
-        print "DURATION  {0:6d} ns".format(int(attrs["time"]))
-        print "          ENERGY                       TEMPERATURE"
-        print "SLOPE     {0:12.4f} kcal mol-1 ns-1 {1:8.4f} K ns-1".format(float(data["energy slope"]),
-                                                                           float(data["temperature slope"]))
-        print "INTERCEPT {0:12.4f} kcal mol-1      {1:8.4f} K".format(float(data["energy intercept"]),
-                                                                      float(data["temperature intercept"]))
-        print "R2        {0:12.4f}                 {1:8.4f}".format(float(data["energy R2"]),
-                                                                    float(data["temperature R2"]))
+        _print_conservation(data, attrs)
     return False
+def _print_conservation(data, attrs):
+    print "DURATION  {0:6d} ns".format(int(attrs["time"]))
+    print "          ENERGY                       TEMPERATURE"
+    print "SLOPE     {0:12.4f} kcal mol-1 ns-1 {1:8.4f} K ns-1".format(float(data["energy slope"]),
+                                                                       float(data["temperature slope"]))
+    print "INTERCEPT {0:12.4f} kcal mol-1      {1:8.4f} K".format(float(data["energy intercept"]),
+                                                                  float(data["temperature intercept"]))
+    print "R2        {0:12.4f}                 {1:8.4f}".format(float(data["energy R2"]),
+                                                                float(data["temperature R2"]))
+

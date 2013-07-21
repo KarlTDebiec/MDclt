@@ -2,7 +2,7 @@
 desc = """general.py
     Functions for primary analysis of MD trajectories
     Written by Karl Debiec on 12-11-30
-    Last updated 13-06-04"""
+    Last updated 13-07-21"""
 ########################################### MODULES, SETTINGS, AND DEFAULTS ############################################
 import os, sys
 import numpy as np
@@ -23,13 +23,19 @@ def com(segment, domain = "", selection = "protein", **kwargs):
     return  [(segment + "/com_" + domain, com),
              (segment + "/com_" + domain, {"selection": selection, "method": "mdanalysis", "units": "A"})]
 def _check_com(hdf5_file, segment, force = False, **kwargs):
+    if not (segment.topology   and os.path.isfile(segment.topology)
+    and     segment.trajectory and os.path.isfile(segment.trajectory)):
+            return False
     domain  = kwargs.get("domain", "")
     if    (force
-    or not segment + "/com_" + domain in hdf5_file): return [(com, segment, kwargs)]
-    else:                                            return False
+    or not segment + "/com_" + domain in hdf5_file):
+            return [(com, segment, kwargs)]
+    else:   return False
 
-def rmsd(segment, reference, domain = "", selection = "protein and name CA", **kwargs):
-    """ Calculates rmsd of <domain> relative to <reference> with <selection> """
+def rmsd(segment, reference, selection = "protein and name CA", destination = "", **kwargs):
+    """ Calculates rmsd of <selection> relative to <reference> """
+    if not (destination == "" or destination.startswith("_")):
+        destination = "_" + destination
     ref         = md.Universe(reference)
     trj         = md.Universe(segment.topology, segment.trajectory)
     rmsd        = np.zeros(len(trj.trajectory),      np.float32)
@@ -41,16 +47,22 @@ def rmsd(segment, reference, domain = "", selection = "protein and name CA", **k
     for i, frame in enumerate(trj.trajectory):
         trj_frame   = (trj_sel.coordinates() - trj_sel.centerOfMass()).T.astype("float64")
         rmsd[i]     = mdaa.qcp.CalcRMSDRotationalMatrix(ref_frame, trj_frame, n_atoms, rotmat[i], None)
-    return  [(segment + "/rmsd_"   + domain,  rmsd),
-             (segment + "/rotmat_" + domain,  np.array(rotmat, np.float32)),
-             (segment + "/rmsd_"   + domain,  {"selection": selection, "method": "mdanalysis", "units": "A"}),
-             (segment + "/rotmat_" + domain,  {"selection": selection, "method": "mdanalysis"})]
+    return  [(segment + "/rmsd"   + destination,  rmsd),
+             (segment + "/rotmat" + destination,  np.array(rotmat, np.float32)),
+             (segment + "/rmsd"   + destination,  {"selection": selection, "method": "mdanalysis", "units": "A"}),
+             (segment + "/rotmat" + destination,  {"selection": selection, "method": "mdanalysis"})]
 def _check_rmsd(hdf5_file, segment, force = False, **kwargs):
-    domain  = kwargs.get("domain",    "")
-    if    (force
-    or not [segment + "/rmsd_"   + domain,
-            segment + "/rotmat_" + domain] in hdf5_file): return [(rmsd, segment, kwargs)]
-    else:                                                 return False
+    destination  = kwargs.get("destination", "")
+    if not (destination == "" or destination.startswith("_")):
+        destination = "_" + destination
+    if not (segment.topology   and os.path.isfile(segment.topology)
+    and     segment.trajectory and os.path.isfile(segment.trajectory)):
+            return False
+    if     (force
+    or not [segment + "/rmsd"   + destination,
+            segment + "/rotmat" + destination] in hdf5_file):
+            return [(rmsd, segment, kwargs)]
+    else:   return False
 
 def contact(segment, res_sel = "(protein or resname ACE)", atom_sel = "(name C* or name N* or name O* or name S*)",
             **kwargs):
@@ -66,10 +78,15 @@ def contact(segment, res_sel = "(protein or resname ACE)", atom_sel = "(name C* 
         contacts[frame_i]   = _cy_contact(trj_sel.coordinates().T.astype("float64"), atomcounts, indexes)
     return  [(segment + "/contact",  contacts)]
 def _check_contact(hdf5_file, segment, force = False, **kwargs):
+    if not (segment.topology   and os.path.isfile(segment.topology)
+    and     segment.trajectory and os.path.isfile(segment.trajectory)):
+            return False
     if    (force
-    or not segment + "/contact" in hdf5_file): return [(contact, segment, kwargs)]
-    else:                                      return False
+    or not segment + "/contact" in hdf5_file):
+            return [(contact, segment, kwargs)]
+    else:   return False
 
+##################################################### DEPRECIATED ######################################################
 #def mindist(arguments):
 #    segment, topology, trajectory, name, group_1, group_2 = arguments
 #    trj         = md.Universe(topology, trajectory)
