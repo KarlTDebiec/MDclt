@@ -299,12 +299,13 @@ def _check_translation(hdf5_file, force = False, **kwargs):
     or not("diffusion/translation" + destination in hdf5_file)):
         return [(translation, kwargs)]
 
+    data    = hdf5_file["diffusion/translation" + destination]
     attrs   = hdf5_file.attrs("diffusion/translation" + destination)
-    if hdf5_file.data["*/log"]["time"][-1] != attrs["time"]:
-        return [(conservation, kwargs)]
-    elif verbose:
-        data    = hdf5_file["diffusion/translation" + destination]
-        _print_translation(data, attrs)
+
+    if (np.any(np.array(delta_ts, np.float32) != data["delta t"])
+    or (hdf5_file.data["*/log"]["time"][-1]   != attrs["time"])):
+        return [(translation, kwargs)]
+    elif verbose:   _print_translation(data, attrs)
     return False
 def _print_translation(data, attrs):
     print "DURATION {0:5d} ns".format(int(attrs["time"]))
