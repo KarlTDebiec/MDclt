@@ -2,7 +2,7 @@
 desc = """vmd.py
     Functions for primary analysis of MD trajectories using Visual Molecular Dynamics
     Written by Karl Debiec on 13-03-06
-    Last updated 13-07-21"""
+    Last updated 13-07-24"""
 ########################################### MODULES, SETTINGS, AND DEFAULTS ############################################
 import os, sys
 import numpy as np
