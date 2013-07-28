@@ -140,7 +140,7 @@ def rotation(hdf5_file,
             tensor[path + "beta"][i]    = np.arccos(Z[2])
             tensor[path + "gamma"][i]   = np.arctan2(X[2],       Y[2])
             if verbose:
-                _print_rotation(tensor, [split[0] for split in splits], control, attrs)
+                _print_rotation(tensor, [path], control, attrs)
     return  [(output_path + "/tensor", tensor),
              (output_path + "/tensor", attrs)]
 def _check_rotation(hdf5_file, force = False, **kwargs):
