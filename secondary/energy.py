@@ -112,13 +112,13 @@ def _print_conservation(data, attrs):
     print "Duration {0:6d} ns".format(int(attrs["time"]))
     print "              Energy                      Temperature"
     print "Slope        {0:12.4f} kcal mol-1 ns-1 {1:8.4f} K ns-1".format(float(data["energy slope"]),
-                                                                       float(data["temperature slope"]))
+                                                                          float(data["temperature slope"]))
     print "Slope se     {0:12.4f} kcal mol-1 ns-1 {1:8.4f} K ns-1".format(float(data["energy slope se"]),
-                                                                       float(data["temperature slope se"]))
+                                                                          float(data["temperature slope se"]))
     print "Intercept    {0:12.4f} kcal mol-1      {1:8.4f} K".format(float(data["energy intercept"]),
-                                                                  float(data["temperature intercept"]))
+                                                                     float(data["temperature intercept"]))
     print "Intercept se {0:12.4f} kcal mol-1      {1:8.4f} K".format(float(data["energy intercept se"]),
-                                                                  float(data["temperature intercept se"]))
+                                                                     float(data["temperature intercept se"]))
     print "R^2          {0:12.4f}                 {1:8.4f}".format(float(data["energy R2"]),
-                                                                float(data["temperature R2"]))
+                                                                   float(data["temperature R2"]))
 
