@@ -19,6 +19,7 @@ def log(segment, **kwargs):
                             ("volume",    "f4"), ("temperature", "f4")])
     log         = np.loadtxt(log, dtype, usecols = (0, 1, 2, 3, 4, 5, 6, 7, 8, 9))
     log["time"]/= 1000
+    log["total"]= log["potential"] + log["kinetic"]
     log_attrs   = {"time units":             "ns",         "total units":       "kcal mol-1",
                    "potential units":        "kcal mol-1", "kinetic units":     "kcal mol-1",
                    "conserved units":        "kcal mol-1", "exchange units":    "kcal mol-1",
