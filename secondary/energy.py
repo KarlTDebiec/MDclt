@@ -2,13 +2,13 @@
 desc = """energy.py
     Functions for secondary analysis of energy
     Written by Karl Debiec on 13-05-06
-    Last updated 13-08-10"""
+    Last updated 13-08-14"""
 ########################################### MODULES, SETTINGS, AND DEFAULTS ############################################
 import os, sys, warnings
 import numpy as np
 from   multiprocessing import Pool
 from   scipy.stats     import linregress
-from   scipy.optimize  import curve_fit
+from   scipy.optimize  import fmin, curve_fit
 ################################################## INTERNAL FUNCTIONS ##################################################
 def _subblock(arguments):
     i, size, n_blocks, x, y  = arguments
@@ -36,30 +36,40 @@ def _block_linregress(x, y, min_size = 10, n_cores = 1, **kwargs):
     pool.close()
     pool.join()
 
-    m_ses           = m_sds / np.sqrt(n_blocks)
-    b_ses           = b_sds / np.sqrt(n_blocks)
-    return sizes, m_ses, b_ses
-def _block(data, function, **kwargs):
-    full_size       = data.size
-    sizes           = np.array(sorted(list(set([full_size / x for x in range(1, full_size)]))), np.int)[:-1]
-    sds             = np.zeros(sizes.size)
-    n_blocks        = full_size // sizes
+    m_ses       = m_sds / np.sqrt(n_blocks - 1.0)
+    b_ses       = b_sds / np.sqrt(n_blocks - 1.0)
+    m_se_sds    = np.sqrt((2.0) / (n_blocks - 1.0)) * m_ses
+    b_se_sds    = np.sqrt((2.0) / (n_blocks - 1.0)) * b_ses
+    m_fit       = _fit_curve(x = sizes, y = m_ses, sigma = m_se_sds, **kwargs["slope"])
+    b_fit       = _fit_curve(x = sizes, y = b_ses, sigma = m_se_sds, **kwargs["int"])
+    return m_fit[0], b_fit[0], sizes, m_ses, m_se_sds, m_fit[-1], b_ses, b_se_sds, b_fit[-1]
+def _block(data, func, func_kwargs = {}, min_size = 1, **kwargs):
+    full_size   = data.size
+    sizes       = [s for s in list(set([full_size / s for s in range(1, full_size)])) if s >= min_size]
+    sizes       = np.array(sorted(sizes), np.int)[:-1]
+    sds         = np.zeros(sizes.size)
+    n_blocks    = full_size // sizes
     for i, size in enumerate(sizes):
-        resized     = np.resize(data, (full_size // size, size))
-        values      = function(resized, **kwargs)
-        sds[i]      = np.std(values)
-    ses             = sds / np.sqrt(n_blocks)
-    return sizes, ses
-def _fit_sigmoid(x, y):
-    def func(x, min_asym, max_asym, poi, k): return max_asym + (min_asym - max_asym) / (1 + (x / poi) ** k)
+        resized = np.resize(data, (full_size // size, size))
+        values  = func(resized, **func_kwargs)
+        sds[i]  = np.std(values)
+    ses                 = sds / np.sqrt(n_blocks - 1.0)
+    se_sds              = np.sqrt((2.0) / (n_blocks - 1.0)) * ses
+    se_sds[se_sds == 0] = se_sds[np.where(se_sds == 0)[0] + 1]
+    fit                 = _fit_curve(x = sizes, y = ses, sigma = se_sds, **kwargs)
+    return fit[0], sizes, ses, se_sds, fit[-1]
+def _fit_curve(fit_func, **kwargs):
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        min_asym, max_asym, poi, k  = curve_fit(func, x, y, maxfev = 100000)[0]
-    y_fit   = func(x, min_asym, max_asym, poi, k)
-    return min_asym, max_asym, poi, k, y_fit
-def _check_positive(x):
-    if float(x) < 0:    raise Exception("x is not a positive number")
-    else:               return x
+        def single_exponential(x, y, **kwargs):
+            def func(x, a, b, c):       return a + b * np.exp(c * x)
+            a, b, c         = curve_fit(func, x, y, **kwargs)[0]
+            return a, b, c, func(x, a, b, c)
+        def double_exponential(x, y, **kwargs):
+            def func(x, a, b, c, d, e): return a + b * np.exp(c * x) + d * np.exp(e * x)
+            a, b, c, d, e   = curve_fit(func, x, y, **kwargs)[0]
+            return a, b, c, d, e, func(x, a, b, c, d, e)
+        return locals()[fit_func](**kwargs)
 def _load_duration(self, path, **kwargs):
     segments    = self._segments()
     durations   = np.zeros(len(segments))
@@ -68,44 +78,48 @@ def _load_duration(self, path, **kwargs):
         durations[i]    = (int(duration[0]) * 60 * 60) + (int(duration[1]) * 60) + int(duration[2])
     return durations
 ################################################## ANALYSIS FUNCTIONS ##################################################
-def conservation(hdf5_file, verbose = False, n_cores = 1, **kwargs):
+def conservation(hdf5_file,
+                 block_settings = {},                       # Kwargs to be used for blocking; override defaults
+                 check_plot     = True,                     # Show plot of blocking results before storing
+                 verbose        = False, n_cores = 1, **kwargs):
     """ Calculates energy drift using linear regression. Error is estimated using the blocking method of Flyvbjerg, H.,
         and Petersen, H. G. Error Estimates on Averages of Correlated Data. J Phys Chem. 1989. 91. 461-466. """
-    time        = hdf5_file.data["*/log"]["time"]
-    energy      = hdf5_file.data["*/log"]["total"]
-    temperature = hdf5_file.data["*/log"]["temperature"]
-    attrs       = {"energy slope units":      "kcal mol-1 ns-1", "energy units":       "kcal mol-1",
-                   "temperature slope units": "K ns -1",         "temperature units":  "K",
-                   "time":                    time[-1]}
+    time            = hdf5_file.data["*/log"]["time"]
+    energy          = hdf5_file.data["*/log"]["total"]
+    temperature     = hdf5_file.data["*/log"]["temperature"]
+    block_kwargs    = {"E_mean": {"min_size": 1,
+                                  "fit_func": "single_exponential", "p0": (  1.00,   -1.00, -0.10), "maxfev":10000},
+                       "E_var":  {"min_size": 1,
+                                  "fit_func": "single_exponential", "p0": (100.00, -100.00, -0.10), "maxfev":10000},
+                       "E_line": {"min_size": 100,
+                        "slope": {"fit_func": "single_exponential", "p0": (  1.00,  100.00, -0.01), "maxfev": 10000},
+                        "int":   {"fit_func": "single_exponential", "p0": (100.00, 1000.00, -0.01), "maxfev": 10000}},
+                       "T_mean": {"min_size": 1,
+                                  "fit_func": "single_exponential", "p0": (  1.00,   -1.00, -1.00), "maxfev": 10000},
+                       "T_var":  {"min_size": 10,
+                                  "fit_func": "single_exponential", "p0": (  0.01,   -0.10, -0.10), "maxfev": 10000},
+                       "T_line": {"min_size": 100,
+                        "slope": {"fit_func": "single_exponential", "p0": (  0.01,    1.00, -0.01), "maxfev": 10000},
+                        "int":   {"fit_func": "single_exponential", "p0": (  1.00,   10.00, -0.01), "maxfev": 10000}}}
+    block_kwargs.update(block_settings)
+    attrs   = {"energy slope units":      "kcal mol-1 ns-1", "energy units":       "kcal mol-1",
+               "temperature slope units": "K ns -1",         "temperature units":  "K",
+               "time":                    time[-1]}
 
-    E_mean                                  = np.mean(energy)
-    try:    E_mean_se                       = _check_positive(_fit_sigmoid(*_block(energy, np.mean, axis = 1))[1])
-    except: E_mean_se,     attrs["note"]    = np.nan, "Standard error calculation failed for one or more parameters"
-    E_variance                              = np.var(energy)
-    try:    E_variance_se                   = _check_positive(_fit_sigmoid(*_block(energy, np.var,  axis = 1))[1])
-    except: E_variance_se, attrs["note"]    = np.nan, "Standard error calculation failed for one or more parameters"
-    E_slope, E_intercept, E_R, _, _         = linregress(time, energy)
-    E_times, E_slope_ses, E_intercept_ses   = _block_linregress(time, energy, n_cores = n_cores)
-    try:    E_slope_se                      = _check_positive(_fit_sigmoid(E_times, E_slope_ses)[1])
-    except: E_slope_se,     attrs["note"]   = np.nan, "Standard error calculation failed for one or more parameters"
-    try:    E_intercept_se                  = _check_positive(_fit_sigmoid(E_times, E_intercept_ses)[1])
-    except: E_intercept_se, attrs["note"]   = np.nan, "Standard error calculation failed for one or more parameters"
+    E_mean, E_var               = np.mean(energy),      np.var(energy)
+    T_mean, T_var               = np.mean(temperature), np.var(temperature)
+    E_slope, E_int, E_R, _, _   = linregress(time, energy)
+    T_slope, T_int, T_R, _, _   = linregress(time, temperature)
 
-    T_mean                                  = np.mean(temperature)
-    try:    T_mean_se                       = _check_positive(_fit_sigmoid(*_block(temperature, np.mean, axis = 1))[1])
-    except: T_mean_se,      attrs["note"]   = np.nan, "Standard error calculation failed for one or more parameters"
-    T_variance                              = np.var(temperature)
-    try:    T_variance_se                   = _check_positive(_fit_sigmoid(*_block(temperature, np.var,  axis = 1))[1])
-    except: T_variance_se,  attrs["note"]   = np.nan, "Standard error calculation failed for one or more parameters"
-    T_slope, T_intercept, T_R, _, _         = linregress(time, temperature)
-    T_times, T_slope_ses, T_intercept_ses   = _block_linregress(time, temperature, n_cores = n_cores)
-    try:    T_slope_se                      = _check_positive(_fit_sigmoid(T_times, T_slope_ses)[1])
-    except: T_slope_se,     attrs["note"]   = np.nan, "Standard error calculation failed for one or more parameters"
-    try:    T_intercept_se                  = _check_positive(_fit_sigmoid(T_times, T_intercept_ses)[1])
-    except: T_intercept_se, attrs["note"]   = np.nan, "Standard error calculation failed for one or more parameters"
+    E_mean_block    = _block(data = energy,      func = np.mean, func_kwargs = {"axis": 1}, **block_kwargs["E_mean"])
+    E_var_block     = _block(data = energy,      func = np.var,  func_kwargs = {"axis": 1}, **block_kwargs["E_var"])
+    T_mean_block    = _block(data = temperature, func = np.mean, func_kwargs = {"axis": 1}, **block_kwargs["T_mean"])
+    T_var_block     = _block(data = temperature, func = np.var,  func_kwargs = {"axis": 1}, **block_kwargs["T_var"])
+    E_line_block    = _block_linregress(x = time, y = energy,      n_cores = n_cores,       **block_kwargs["E_line"])
+    T_line_block    = _block_linregress(x = time, y = temperature, n_cores = n_cores,       **block_kwargs["E_line"])
 
-    data    = [E_mean, E_mean_se, E_variance, E_variance_se, E_slope, E_slope_se, E_intercept, E_intercept_se, E_R ** 2, 
-               T_mean, T_mean_se, T_variance, T_variance_se, T_slope, T_slope_se, T_intercept, T_intercept_se, T_R ** 2]
+    data    = [E_mean, E_mean_block[0], E_var, E_var_block[0], E_slope, E_line_block[0], E_int, E_line_block[1], E_R**2,
+               T_mean, T_mean_block[0], T_var, T_var_block[0], T_slope, T_line_block[0], T_int, T_line_block[1], T_R**2]
     dtype   = [("energy mean",           "f4"), ("energy mean se",           "f4"),
                ("energy variance",       "f4"), ("energy variance se",       "f4"),
                ("energy slope",          "f4"), ("energy slope se",          "f4"),
@@ -125,6 +139,9 @@ def conservation(hdf5_file, verbose = False, n_cores = 1, **kwargs):
     data                    = np.array(tuple(data), np.dtype(dtype))
     kwargs["data_kwargs"]   = {"chunks": False}             # h5py cannot chunk record array of length 1
     if verbose:               _print_conservation(data, attrs)
+    if check_plot:
+        if not _plot_conservation(E_mean_block ,E_var_block, E_line_block, T_mean_block, T_var_block, T_line_block):
+            return None
     return  [("energy/conservation", data, kwargs),
              ("energy/conservation", attrs)]
 def _check_conservation(hdf5_file, force = False, **kwargs):
@@ -163,4 +180,26 @@ def _print_conservation(data, attrs):
            float(data["temperature intercept"]),    float(data["temperature intercept se"]))
     print "R^2            {0:12.4f}                             {1:8.4f}".format(
            float(data["energy R2"]), float(data["temperature R2"]))
+def _plot_conservation(E_mean_block, E_var_block, E_line_block, T_mean_block, T_var_block, T_line_block):
+    import matplotlib.pyplot as plt
+    def plot(axes, title, sizes, ses, se_sds, ses_fit):
+        axes.set_title(title)
+        axes.fill_between(np.log10(sizes), ses-1.96*se_sds, ses+1.96*se_sds, color = "blue", alpha = 0.5, lw = 0)
+        axes.plot(        np.log10(sizes), ses,                              color = "blue")
+        axes.plot(        np.log10(sizes), ses_fit,                          color = "black")
+    figure  = plt.figure(figsize = (11, 8.5))
+    figure.subplots_adjust(left = 0.05, right = 0.975, bottom = 0.05, top = 0.95, hspace = 0.3, wspace = 0.15)
+    axes    = dict((i, figure.add_subplot(4, 2, i)) for i in xrange(1, 9))
+    plot(axes[1], "Energy Mean",           *E_mean_block[1:])
+    plot(axes[2], "Energy Variance",       *E_var_block[1:])
+    plot(axes[3], "Energy Slope",          *E_line_block[2:6])
+    plot(axes[4], "Energy Intercept",       E_line_block[2], *E_line_block[6:])
+    plot(axes[5], "Temperature Mean",      *T_mean_block[1:])
+    plot(axes[6], "Temperature Variance",  *T_var_block[1:])
+    plot(axes[7], "Temperature Slope",     *T_line_block[2:6])
+    plot(axes[8], "Temperature Intercept",  T_line_block[2], *T_line_block[6:])
+    plt.show()
+    if raw_input("store data in hdf5_file? (Y/n):").lower() in ["n", "no"]: return False
+    else:                                                                   return True
+
 
