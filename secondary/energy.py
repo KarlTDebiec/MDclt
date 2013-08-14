@@ -140,7 +140,7 @@ def conservation(hdf5_file,
     kwargs["data_kwargs"]   = {"chunks": False}             # h5py cannot chunk record array of length 1
     if verbose:               _print_conservation(data, attrs)
     if check_plot:
-        if not _plot_conservation(E_mean_block ,E_var_block, E_line_block, T_mean_block, T_var_block, T_line_block):
+        if not _plot_conservation(hdf5_file.filename.split("/")[-1], E_mean_block ,E_var_block, E_line_block, T_mean_block, T_var_block, T_line_block):
             return None
     return  [("energy/conservation", data, kwargs),
              ("energy/conservation", attrs)]
@@ -180,15 +180,25 @@ def _print_conservation(data, attrs):
            float(data["temperature intercept"]),    float(data["temperature intercept se"]))
     print "R^2            {0:12.4f}                             {1:8.4f}".format(
            float(data["energy R2"]), float(data["temperature R2"]))
-def _plot_conservation(E_mean_block, E_var_block, E_line_block, T_mean_block, T_var_block, T_line_block):
+def _plot_conservation(title, E_mean_block, E_var_block, E_line_block, T_mean_block, T_var_block, T_line_block):
+    import matplotlib as mpl
     import matplotlib.pyplot as plt
+    import matplotlib.widgets as wdg
+    from time import sleep
     def plot(axes, title, sizes, ses, se_sds, ses_fit):
         axes.set_title(title)
         axes.fill_between(np.log10(sizes), ses-1.96*se_sds, ses+1.96*se_sds, color = "blue", alpha = 0.5, lw = 0)
         axes.plot(        np.log10(sizes), ses,                              color = "blue")
         axes.plot(        np.log10(sizes), ses_fit,                          color = "black")
+    changes = {"accepted": True}
+    def keypress(event):
+        if   event.key in ["enter", " ", "y"]:  changes["accepted"] = True
+        elif event.key in ["escape", "n"]:      changes["accepted"] = False
+        print "PRESSED", event.key, changes
     figure  = plt.figure(figsize = (11, 8.5))
-    figure.subplots_adjust(left = 0.05, right = 0.975, bottom = 0.05, top = 0.95, hspace = 0.3, wspace = 0.15)
+    figure.subplots_adjust(left = 0.05, right = 0.975, bottom = 0.05, top = 0.90, hspace = 0.3, wspace = 0.15)
+    figure.suptitle(title)
+    figure.canvas.mpl_connect("key_press_event", keypress)
     axes    = dict((i, figure.add_subplot(4, 2, i)) for i in xrange(1, 9))
     plot(axes[1], "Energy Mean",           *E_mean_block[1:])
     plot(axes[2], "Energy Variance",       *E_var_block[1:])
@@ -199,7 +209,7 @@ def _plot_conservation(E_mean_block, E_var_block, E_line_block, T_mean_block, T_
     plot(axes[7], "Temperature Slope",     *T_line_block[2:6])
     plot(axes[8], "Temperature Intercept",  T_line_block[2], *T_line_block[6:])
     plt.show()
-    if raw_input("store data in hdf5_file? (Y/n):").lower() in ["n", "no"]: return False
-    else:                                                                   return True
+    if changes["accepted"]: return True
+    else:                   return False
 
 
