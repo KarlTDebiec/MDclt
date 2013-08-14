@@ -8,7 +8,7 @@ import os, sys, warnings
 import numpy as np
 from   multiprocessing import Pool
 from   scipy.stats     import linregress
-from   scipy.optimize  import fmin, curve_fit
+from   scipy.optimize  import curve_fit
 ################################################## INTERNAL FUNCTIONS ##################################################
 def _subblock(arguments):
     i, size, n_blocks, x, y  = arguments
