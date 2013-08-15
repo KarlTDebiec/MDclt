@@ -80,7 +80,7 @@ def _load_duration(self, path, **kwargs):
 ################################################## ANALYSIS FUNCTIONS ##################################################
 def conservation(hdf5_file,
                  block_settings = {},                       # Kwargs to be used for blocking; override defaults
-                 check_plot     = True,                     # Show plot of blocking results before storing
+                 check_plot     = False,                    # Show plot of blocking results before storing
                  verbose        = False, n_cores = 1, **kwargs):
     """ Calculates energy drift using linear regression. Error is estimated using the blocking method of Flyvbjerg, H.,
         and Petersen, H. G. Error Estimates on Averages of Correlated Data. J Phys Chem. 1989. 91. 461-466. """
@@ -139,9 +139,9 @@ def conservation(hdf5_file,
     data                    = np.array(tuple(data), np.dtype(dtype))
     kwargs["data_kwargs"]   = {"chunks": False}             # h5py cannot chunk record array of length 1
     if verbose:               _print_conservation(data, attrs)
-    if check_plot:
-        if not _plot_conservation(hdf5_file.filename.split("/")[-1], E_mean_block ,E_var_block, E_line_block, T_mean_block, T_var_block, T_line_block):
-            return None
+    if (check_plot and not _plot_conservation(hdf5_file.filename.split("/")[-1], E_mean_block ,E_var_block,
+        E_line_block, T_mean_block, T_var_block, T_line_block)):
+        return None
     return  [("energy/conservation", data, kwargs),
              ("energy/conservation", attrs)]
 def _check_conservation(hdf5_file, force = False, **kwargs):
@@ -184,21 +184,25 @@ def _plot_conservation(title, E_mean_block, E_var_block, E_line_block, T_mean_bl
     import matplotlib as mpl
     import matplotlib.pyplot as plt
     import matplotlib.widgets as wdg
-    from time import sleep
     def plot(axes, title, sizes, ses, se_sds, ses_fit):
         axes.set_title(title)
         axes.fill_between(np.log10(sizes), ses-1.96*se_sds, ses+1.96*se_sds, color = "blue", alpha = 0.5, lw = 0)
         axes.plot(        np.log10(sizes), ses,                              color = "blue")
         axes.plot(        np.log10(sizes), ses_fit,                          color = "black")
-    changes = {"accepted": True}
     def keypress(event):
         if   event.key in ["enter", " ", "y"]:  changes["accepted"] = True
         elif event.key in ["escape", "n"]:      changes["accepted"] = False
         print "PRESSED", event.key, changes
-    figure  = plt.figure(figsize = (11, 8.5))
-    figure.subplots_adjust(left = 0.05, right = 0.975, bottom = 0.05, top = 0.90, hspace = 0.3, wspace = 0.15)
+    def radio_clicked(label):
+        if   label == "Accept":                 changes["accepted"] = True
+        elif label == "Reject":                 changes["accepted"] = False
+        plt.draw()
+    changes = {"accepted": True}
+    figure  = plt.figure(figsize = (12, 10))
+    figure.subplots_adjust(left = 0.05, right = 0.975, bottom = 0.1, top = 0.925, hspace = 0.35, wspace = 0.15)
     figure.suptitle(title)
     figure.canvas.mpl_connect("key_press_event", keypress)
+
     axes    = dict((i, figure.add_subplot(4, 2, i)) for i in xrange(1, 9))
     plot(axes[1], "Energy Mean",           *E_mean_block[1:])
     plot(axes[2], "Energy Variance",       *E_var_block[1:])
@@ -208,8 +212,24 @@ def _plot_conservation(title, E_mean_block, E_var_block, E_line_block, T_mean_bl
     plot(axes[6], "Temperature Variance",  *T_var_block[1:])
     plot(axes[7], "Temperature Slope",     *T_line_block[2:6])
     plot(axes[8], "Temperature Intercept",  T_line_block[2], *T_line_block[6:])
+#    for i, axis in axes.iteritems():
+#        print i, axis.get_position()
+    radio   = wdg.RadioButtons(plt.axes([0.875, 0.015, 0.1, 0.05]), ("Accept", "Reject"))
+    radio.on_clicked(radio_clicked)
     plt.show()
+
     if changes["accepted"]: return True
     else:                   return False
+
+
+
+
+
+
+
+
+
+
+
 
 
