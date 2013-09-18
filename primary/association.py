@@ -36,7 +36,7 @@ def _check_comdist(hdf5_file, segment, force = False, **kwargs):
             return [(comdist, segment, kwargs)]
     else:   return False
 
-def mindist(segment, selection_1, selection_2, mode = "residue", **kwargs):
+def mindist(segment, selection_1, selection_2, mode = "residue", destination = "association_mindist", **kwargs):
     """ Calculates minimum distance between two selections or two residue types; assumes cubic box and pbc """
     trj         = md.Universe(segment.topology, segment.trajectory)
     if   mode  == "residue":
@@ -56,14 +56,15 @@ def mindist(segment, selection_1, selection_2, mode = "residue", **kwargs):
             for k, mol2 in enumerate(mol2s):
                 distance         = _cy_distance_pbc(mol1.coordinates(), mol2.coordinates(), float(frame.dimensions[0]))
                 mindist[i, j, k] = np.min(distance)
-    return  [(segment + "/association_mindist", mindist),
-             (segment + "/association_mindist", {"units": "A"})]
+    return  [(segment + "/" + destination, mindist),
+             (segment + "/" + destination, {"units": "A"})]
 def _check_mindist(hdf5_file, segment, force = False, **kwargs):
+    destination = kwargs.get("destination", "association_mindist")
     if not (segment.topology   and os.path.isfile(segment.topology)
     and     segment.trajectory and os.path.isfile(segment.trajectory)):
             return False
     if (force
-    or  not (segment + "/association_mindist" in hdf5_file)):
+    or  not (segment + "/" + destination in hdf5_file)):
             return [(mindist, segment, kwargs)]
     else:   return False
 

@@ -42,6 +42,7 @@ def _block_linregress(x, y, min_size = 10, n_cores = 1, **kwargs):
     b_se_sds    = np.sqrt((2.0) / (n_blocks - 1.0)) * b_ses
     m_fit       = _fit_curve(x = sizes, y = m_ses, sigma = m_se_sds, **kwargs["slope"])
     b_fit       = _fit_curve(x = sizes, y = b_ses, sigma = m_se_sds, **kwargs["int"])
+#    print m_fit[:-1], b_fit[:-1]
     return m_fit[0], b_fit[0], sizes, m_ses, m_se_sds, m_fit[-1], b_ses, b_se_sds, b_fit[-1]
 def _block(data, func, func_kwargs = {}, min_size = 1, **kwargs):
     full_size   = data.size
@@ -57,6 +58,7 @@ def _block(data, func, func_kwargs = {}, min_size = 1, **kwargs):
     se_sds              = np.sqrt((2.0) / (n_blocks - 1.0)) * ses
     se_sds[se_sds == 0] = se_sds[np.where(se_sds == 0)[0] + 1]
     fit                 = _fit_curve(x = sizes, y = ses, sigma = se_sds, **kwargs)
+#    print fit[:-1]
     return fit[0], sizes, ses, se_sds, fit[-1]
 def _fit_curve(fit_func, **kwargs):
     with warnings.catch_warnings():
@@ -88,19 +90,19 @@ def conservation(hdf5_file,
     energy          = hdf5_file.data["*/log"]["total"]
     temperature     = hdf5_file.data["*/log"]["temperature"]
     block_kwargs    = {"E_mean": {"min_size": 1,
-                                  "fit_func": "single_exponential", "p0": (  1.00,   -1.00, -0.10), "maxfev":10000},
+                                  "fit_func": "single_exponential", "p0": (  1.00,   -1.00, -0.10), "maxfev": 100000},
                        "E_var":  {"min_size": 1,
-                                  "fit_func": "single_exponential", "p0": (100.00, -100.00, -0.10), "maxfev":10000},
+                                  "fit_func": "single_exponential", "p0": (100.00, -100.00, -0.10), "maxfev": 100000},
                        "E_line": {"min_size": 100,
-                        "slope": {"fit_func": "single_exponential", "p0": (  1.00,  100.00, -0.01), "maxfev": 10000},
-                        "int":   {"fit_func": "single_exponential", "p0": (100.00, 1000.00, -0.01), "maxfev": 10000}},
+                        "slope": {"fit_func": "single_exponential", "p0": (  1.00,  100.00, -0.01), "maxfev": 100000},
+                        "int":   {"fit_func": "single_exponential", "p0": (100.00, 1000.00, -0.01), "maxfev": 100000}},
                        "T_mean": {"min_size": 1,
-                                  "fit_func": "single_exponential", "p0": (  1.00,   -1.00, -1.00), "maxfev": 10000},
+                                  "fit_func": "single_exponential", "p0": (  1.00,   -1.00, -1.00), "maxfev": 100000},
                        "T_var":  {"min_size": 10,
-                                  "fit_func": "single_exponential", "p0": (  0.01,   -0.10, -0.10), "maxfev": 10000},
+                                  "fit_func": "single_exponential", "p0": (  0.01,   -0.10, -0.10), "maxfev": 100000},
                        "T_line": {"min_size": 100,
-                        "slope": {"fit_func": "single_exponential", "p0": (  0.01,    1.00, -0.01), "maxfev": 10000},
-                        "int":   {"fit_func": "single_exponential", "p0": (  1.00,   10.00, -0.01), "maxfev": 10000}}}
+                        "slope": {"fit_func": "single_exponential", "p0": (  0.01,    1.00, -0.01), "maxfev": 100000},
+                        "int":   {"fit_func": "single_exponential", "p0": (  1.00,   10.00, -0.01), "maxfev": 100000}}}
     block_kwargs.update(block_settings)
     attrs   = {"energy slope units":      "kcal mol-1 ns-1", "energy units":       "kcal mol-1",
                "temperature slope units": "K ns -1",         "temperature units":  "K",
@@ -169,11 +171,11 @@ def _print_conservation(data, attrs):
     print "Mean (se)      {0:12.4f} ({1:9.4f}) kcal mol-1      {2:8.4f} ({3:8.4f}) K".format(
            float(data["energy mean"]),              float(data["energy mean se"]),
            float(data["temperature mean"]),         float(data["temperature mean se"]))
-    print "Variance (se)  {0:12.4f} ({1:9.4f}) kcal mol-1      {2:8.4f} ({3:8.4f}) K".format(
+    print "Variance (se)  {0:12.4f} ({1:9.4f}) kcal2 mol-2     {2:8.4f} ({3:8.4f}) K".format(
            float(data["energy variance"]),          float(data["energy variance se"]),
            float(data["temperature variance"]),     float(data["temperature variance se"]))
-    print "Slope (se)     {0:12.4f} ({1:9.4f}) kcal mol-1 ns-1 {2:8.4f} ({3:8.4f}) K ns-1".format(
-           float(data["energy slope"]),             float(data["energy slope se"]),
+    print "Slope (se)     {0:12.4f} ({1:9.4f}) kcal mol-1 ps-1 {2:8.4f} ({3:8.4f}) K ns-1".format(
+           float(data["energy slope"]) / 1000,      float(data["energy slope se"]) / 1000,
            float(data["temperature slope"]),        float(data["temperature slope se"]))
     print "Intercept (se) {0:12.4f} ({1:9.4f}) kcal mol-1      {2:8.4f} ({3:8.4f}) K".format(
            float(data["energy intercept"]),         float(data["energy intercept se"]),
@@ -189,10 +191,9 @@ def _plot_conservation(title, E_mean_block, E_var_block, E_line_block, T_mean_bl
         axes.fill_between(np.log10(sizes), ses-1.96*se_sds, ses+1.96*se_sds, color = "blue", alpha = 0.5, lw = 0)
         axes.plot(        np.log10(sizes), ses,                              color = "blue")
         axes.plot(        np.log10(sizes), ses_fit,                          color = "black")
-    def keypress(event):
-        if   event.key in ["enter", " ", "y"]:  changes["accepted"] = True
-        elif event.key in ["escape", "n"]:      changes["accepted"] = False
-        print "PRESSED", event.key, changes
+#    def keypress(event):
+#        if   event.key in ["enter", " ", "y"]:  changes["accepted"] = True
+#        elif event.key in ["escape", "n"]:      changes["accepted"] = False
     def radio_clicked(label):
         if   label == "Accept":                 changes["accepted"] = True
         elif label == "Reject":                 changes["accepted"] = False
@@ -201,7 +202,7 @@ def _plot_conservation(title, E_mean_block, E_var_block, E_line_block, T_mean_bl
     figure  = plt.figure(figsize = (12, 10))
     figure.subplots_adjust(left = 0.05, right = 0.975, bottom = 0.1, top = 0.925, hspace = 0.35, wspace = 0.15)
     figure.suptitle(title)
-    figure.canvas.mpl_connect("key_press_event", keypress)
+#    figure.canvas.mpl_connect("key_press_event", keypress)
 
     axes    = dict((i, figure.add_subplot(4, 2, i)) for i in xrange(1, 9))
     plot(axes[1], "Energy Mean",           *E_mean_block[1:])

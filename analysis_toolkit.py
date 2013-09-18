@@ -91,15 +91,19 @@ def analyze_secondary(hdf5_filename, analyses, n_cores = 1):
     """ Performs secondary analysis (analysis of primary analysis)
         1) Builds task list based on <analyses>, concurrently loads required data from <hdf5_filename>
         2) Completes tasks in serial, using <n_cores> for each task (if implemented), and writes results to
-           <hdf5_filename>"""
+           <hdf5_filename> """
     print "Analyzing file {0}".format(hdf5_filename.replace("//","/"))
-    for module in set([m.split(".")[0] for m in [a[0] for a in analyses]]): import_module("secondary." + module)
+    for module in set([m for m in [a.split(".")[0] for a in [a[0] for a in analyses]] if m != "custom"]):
+        import_module("secondary." + module)
 
     with HDF5_File(hdf5_filename) as hdf5_file:
         task_list   = []
         for module_function, kwargs in analyses:
             module, function    = module_function.split(".")
-            check_function      = getattr(sys.modules["secondary." + module], "_check_" + function)
+            if module != "custom":
+                check_function  = getattr(sys.modules["secondary." + module], "_check_" + function)
+            else:
+                check_function  = getattr(inspect.getmodule(inspect.stack()[1][0]), "_check_" + function)
             new_tasks           = check_function(hdf5_file, **kwargs)
             if new_tasks:
                 task_list      += new_tasks

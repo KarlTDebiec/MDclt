@@ -237,7 +237,7 @@ def _fit_sigmoid(x, y):
 def translation(hdf5_file,
                 destination     = "",                       # Origin of primary data and destination of secondary data
                 delta_t         = np.array([0.1]),          # Delta_t values to test (ns)
-                selection       = [],                       # Selection names
+                selection       = [],                       # Selection names 
                 explicit_names  = False,                    # Explicitly name selections in output table
                 control         = np.nan,                   # Control value for comparison (if verbose)
                 verbose         = False, n_cores = 1, **kwargs):
