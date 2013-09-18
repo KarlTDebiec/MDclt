@@ -103,6 +103,7 @@ class HDF5_File:
         elif type == "table" and path.startswith("*"): loader = self._load_split_table
         elif type == "table":                          loader = self._load_whole_table
         self.data[destination]  = loader(self._strip_path(path), **kwargs)
+        return self.data[destination]
     def attrs(self, path, **kwargs):
         if not self.file: self._open_file()
         return dict(self.hierarchy[self._strip_path(path)].attrs)

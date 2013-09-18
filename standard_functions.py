@@ -79,6 +79,38 @@ def shell_iterator(command, leader = "", verbose = False, **kwargs):
         if verbose: print leader + line.rstrip().replace("\n", " ")
         yield             leader + line.rstrip().replace("\n", " ")
     pipe.wait()
+def block_average(data, func = np.mean, func_kwargs = {"axis": 1}, min_size = 1, **kwargs):
+    full_size   = data.size
+    sizes       = [s for s in list(set([full_size / s for s in range(1, full_size)])) if s >= min_size]
+    sizes       = np.array(sorted(sizes), np.int)[:-1]
+    sds         = np.zeros(sizes.size)
+    n_blocks    = full_size // sizes
+    for i, size in enumerate(sizes):
+        resized = np.resize(data, (full_size // size, size))
+        values  = func(resized, **func_kwargs)
+        sds[i]  = np.std(values)
+    ses                 = sds / np.sqrt(n_blocks - 1.0)
+    se_sds              = np.sqrt((2.0) / (n_blocks - 1.0)) * ses
+    se_sds[se_sds == 0] = se_sds[np.where(se_sds == 0)[0] + 1]
+    return sizes, ses, se_sds
+def fit_curve(fit_func = "single_exponential", **kwargs):
+    import warnings
+    from   scipy.optimize import curve_fit
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        def single_exponential(x, y, **kwargs):
+            def func(x, a, b, c):       return a + b * np.exp(c * x)
+            a, b, c         = curve_fit(func, x, y, **kwargs)[0]
+            return a, b, c, func(x, a, b, c)
+        def double_exponential(x, y, **kwargs):
+            def func(x, a, b, c, d, e): return a + b * np.exp(c * x) + d * np.exp(e * x)
+            a, b, c, d, e   = curve_fit(func, x, y, **kwargs)[0]
+            return a, b, c, d, e, func(x, a, b, c, d, e)
+        def sigmoid(x, y, **kwargs):
+            def func(x, a, b, c, d):    return b + (a - b) / (1.0 + (x / c) ** d)
+            a, b, c, d      = curve_fit(func, x, y, **kwargs)[0]
+            return a, b, c, d, func(x, a, b, c, d)
+        return locals()[fit_func](**kwargs)
 ################################################## ANALYSIS FUNCTIONS ##################################################
 def _contact_1D_to_2D_map(contact_1D):
     """ Converts a 1D (sparse) contact map <contact_1D> to a 2D (complete) contact map """
