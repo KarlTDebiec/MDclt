@@ -100,43 +100,43 @@ def rate(hdf5_file,
     poi            *= dt
     Ka_se           = _P_bound_se_to_Ka_se(P_bound[-1], C_mol1_total, C_mol2_total, max_asym)
 
-#    fpt_on      = []                                                    # Calculate kon and koff from first passage time
-#    fpt_off     = []
-#    for i in range(n_molecule_1):
-#        for j in range(n_molecule_2):
-#            trans_bound     = bound[:-1,i,j] - bound[1:,i,j]
-#            enter_bound     = np.where(trans_bound  == -1)[0] + 1
-#            enter_unbound   = np.where(trans_bound  ==  1)[0] + 1
-#            if   enter_bound[0] < enter_unbound[0] and enter_bound[-1] < enter_unbound[-1]:
-#                fpt_on     += [enter_bound[1:]   - enter_unbound[:-1]]
-#                fpt_off    += [enter_unbound     - enter_bound]
-#            elif enter_bound[0] < enter_unbound[0] and enter_bound[-1] > enter_unbound[-1]:
-#                fpt_on     += [enter_bound[1:]   - enter_unbound]
-#                fpt_off    += [enter_unbound     - enter_bound[:-1]]
-#            elif enter_bound[0] > enter_unbound[0] and enter_bound[-1] < enter_unbound[-1]:
-#                fpt_on     += [enter_bound       - enter_unbound[:-1]]
-#                fpt_off    += [enter_unbound[1:] - enter_bound]
-#            elif enter_bound[0] > enter_unbound[0] and enter_bound[-1] > enter_unbound[-1]:
-#                fpt_on     += [enter_bound       - enter_unbound]
-#                fpt_off    += [enter_unbound[1:] - enter_bound[:-1]]
-#    fpt_on      = np.array(np.concatenate(fpt_on),  np.float32) * dt
-#    fpt_off     = np.array(np.concatenate(fpt_off), np.float32) * dt
+    fpt_on      = []                                                    # Calculate kon and koff from first passage time
+    fpt_off     = []
+    for i in range(n_molecule_1):
+        for j in range(n_molecule_2):
+            trans_bound     = bound[:-1,i,j] - bound[1:,i,j]
+            enter_bound     = np.where(trans_bound  == -1)[0] + 1
+            enter_unbound   = np.where(trans_bound  ==  1)[0] + 1
+            if   enter_bound[0] < enter_unbound[0] and enter_bound[-1] < enter_unbound[-1]:
+                fpt_on     += [enter_bound[1:]   - enter_unbound[:-1]]
+                fpt_off    += [enter_unbound     - enter_bound]
+            elif enter_bound[0] < enter_unbound[0] and enter_bound[-1] > enter_unbound[-1]:
+                fpt_on     += [enter_bound[1:]   - enter_unbound]
+                fpt_off    += [enter_unbound     - enter_bound[:-1]]
+            elif enter_bound[0] > enter_unbound[0] and enter_bound[-1] < enter_unbound[-1]:
+                fpt_on     += [enter_bound       - enter_unbound[:-1]]
+                fpt_off    += [enter_unbound[1:] - enter_bound]
+            elif enter_bound[0] > enter_unbound[0] and enter_bound[-1] > enter_unbound[-1]:
+                fpt_on     += [enter_bound       - enter_unbound]
+                fpt_off    += [enter_unbound[1:] - enter_bound[:-1]]
+    fpt_on      = np.array(np.concatenate(fpt_on),  np.float32) * dt
+    fpt_off     = np.array(np.concatenate(fpt_off), np.float32) * dt
 
-#    C_one       = _concentration(1, volume)
-#    kon_sim     = 1 / np.mean(fpt_on)
-#    koff_sim    = 1 / np.mean(fpt_off)
-#    kon_sim_se  = (kon_sim  ** 2 * np.std(fpt_on))  / np.sqrt(fpt_on.size)
-#    koff_sim_se = (koff_sim ** 2 * np.std(fpt_off)) / np.sqrt(fpt_off.size)
-#    kon         = kon_sim  / (C_one * C_one)
-#    koff        = koff_sim /  C_one
-#    kon_se      = kon  * (kon_sim_se  / kon_sim)
-#    koff_se     = koff * (koff_sim_se / koff_sim)
+    C_one       = _concentration(1, volume)
+    kon_sim     = 1 / np.mean(fpt_on)
+    koff_sim    = 1 / np.mean(fpt_off)
+    kon_sim_se  = (kon_sim  ** 2 * np.std(fpt_on))  / np.sqrt(fpt_on.size)
+    koff_sim_se = (koff_sim ** 2 * np.std(fpt_off)) / np.sqrt(fpt_off.size)
+    kon         = kon_sim  / (C_one * C_one)
+    koff        = koff_sim /  C_one
+    kon_se      = kon  * (kon_sim_se  / kon_sim)
+    koff_se     = koff * (koff_sim_se / koff_sim)
 
-#    print fpt_on, np.mean(fpt_on)
-#    print fpt_off, np.mean(fpt_off)
-#    print kon, kon_se
-#    print koff, koff_se
-#    print kon / koff, kon / koff * np.sqrt((kon_se / kon) ** 2 + (koff_se / koff) ** 2)
+    print fpt_on, np.mean(fpt_on)
+    print fpt_off, np.mean(fpt_off)
+    print kon, kon_se
+    print koff, koff_se
+    print kon / koff, kon / koff * np.sqrt((kon_se / kon) ** 2 + (koff_se / koff) ** 2)
 
     fpt_on      = []                                                    # Calculate kon and koff from first passage time
     fpt_off     = []
@@ -159,8 +159,8 @@ def rate(hdf5_file,
             fpt_off    += [enter_unbound[1:] - enter_bound[:-1]]
     fpt_on      = np.array(np.concatenate(fpt_on),  np.float32) * dt
     fpt_off     = np.array(np.concatenate(fpt_off), np.float32) * dt
-#    print fpt_on, np.mean(fpt_on)
-#    print fpt_off, np.mean(fpt_off)
+    print fpt_on, np.mean(fpt_on)
+    print fpt_off, np.mean(fpt_off)
 
     kon_sim     = 1 / np.mean(fpt_on)
     koff_sim    = 1 / np.mean(fpt_off)
@@ -250,33 +250,33 @@ def pmf(hdf5_file,
     count           = hdf5_file.data[source]
 
     centers         = (bins[:-1] + bins[1:]) / 2.0
-    P               = np.array(count, dtype = np.float32) / np.sum(count)
-    P[P == 0.0]     = np.nan
-    P_adjusted      = P / (centers ** 2.0)                                      # Adjust by r^2
-    P_adjusted     /= np.nansum(P_adjusted)                                     # Normalize
-    pmf_final       = np.log(P_adjusted) * -1 * 0.0019872041 * temperature
+    probability     = np.array(count, dtype = np.float32) / np.sum(count)
+    probability[probability == 0.0] = np.nan
+    free_energy     = -1.0 * np.log(probability)
+
+    pmf             = probability / (centers ** 2.0)                            # Adjust by Jacobian
+    pmf            /= np.nansum(pmf)                                            # Normalize
+    pmf             = -1.0 * np.log(pmf) * 0.0019872041 * temperature           # Convert to kcal/mol
     if zero_point:                                                              # Adjust to zero point
-        if    isinstance(zero_point, types.StringTypes):
-            if   ":" in zero_point:
-                zero_start, zero_end = zero_point.split(":")
-            elif "-" in zero_point:
-                zero_start, zero_end = zero_point.split("-")
-            else:
-                zero_start, zero_end = zero_point.split()
+        if isinstance(zero_point, types.StringTypes):
+            if   ":" in zero_point:     zero_start, zero_end = zero_point.split(":")
+            elif "-" in zero_point:     zero_start, zero_end = zero_point.split("-")
+            else:                       zero_start, zero_end = zero_point.split()
             zero_start      = np.abs(bins - float(zero_start)).argmin()
             zero_end        = np.abs(bins - float(zero_end)).argmin()
-            value_at_zero   = np.mean(pmf_final[zero_start:zero_end])
+            value_at_zero   = np.mean(pmf[zero_start:zero_end])
         else:
-            value_at_zero   = pmf_final[np.abs(centers - zero_point).argmin()]
-        pmf_final          -= value_at_zero
+            value_at_zero   = pmf[np.abs(centers - zero_point).argmin()]
+        pmf                -= value_at_zero
     else:
         zero_point          = "None"
 
-    data    = np.array([tuple(frame) for frame in zip(bins[:-1], bins[1:], count, P, P_adjusted, pmf_final)],
-                       np.dtype([("lower bound", "f4"), ("upper bound",          "f4"), ("count", "i4"),
-                                 ("probability", "f4"), ("adjusted probability", "f4"), ("pmf",   "f4")]))
-    attrs   = {"lower bound units": "A",         "upper bound units": "A",        "pmf units": "kcal mol-1",
-               "temperature":       temperature, "zero_point":        zero_point, "time":       duration}
+    data    = np.array([tuple(frame) for frame in zip(bins[:-1], bins[1:], count, probability, free_energy, pmf)],
+                       np.dtype([("lower bound", "f4"), ("upper bound", "f4"), ("count", "i4"),
+                                 ("probability", "f4"), ("free_energy", "f4"), ("pmf",   "f4")]))
+    attrs   = {"lower bound units": "A",          "upper bound units": "A",         "free energy units": "kBT",
+               "pmf units":         "kcal mol-1", "temperature":       temperature, "zero_point" :        zero_point,
+               "time":              duration}
     if verbose: _print_pmf(pcoord, data, attrs)
     return  [(destination, data),
              (destination, attrs)]
@@ -315,9 +315,9 @@ def _check_pmf(hdf5_file, force = False, **kwargs):
 def _print_pmf(pcoord, data, attrs):
     print "DURATION {0:5d} ns PROGRESS COORDINATE {1} ".format(int(attrs["time"]),   pcoord.upper())
     print "TEMPERAUTRE {0:6.3f} K ZERO POINT {1}".format(float(attrs["temperature"]), attrs["zero_point"])
-    print "  LOWER  UPPER  COUNT        P     PMF"
+    print "  LOWER  UPPER  COUNT        P      FE     PMF"
     for line in data:
-        print "{0:>7.3f}{1:>7.3f}{2:>7d}{3:>9.6f}{4:>8.4f}".format(line[0], line[1], line[2], line[4], line[5])
+        print "{0:>7.3f}{1:>7.3f}{2:>7.0f}{3:>9.6f}{4:>8.4f}{5:>8.4f}".format(*map(float, line))
 
 
 def distance_histogram(hdf5_file,
@@ -375,8 +375,10 @@ def _print_distance_histogram(pcoord, data, attrs):
     print "  LOWER  UPPER{0:>7d}{1:>7d}{2:>7d}{3:>7d}{4:>7d}{5:>7d}{6:>7d}{7:>7d}".format(*range(9)),
     print "{0:>7d}{1:>7d}{2:>7d}{3:>7d}{4:>7d}{5:>7d}{6:>7d}".format(*range(8, 15, 1))
     for line in data:
-        print "{0:>7.3f}{1:>7.3f}{2:>7d}{3:>7d}{4:>7d}{5:>7d}{6:>7d}{7:>7d}{8:>7d}{9:>7d}".format(*list(line)[:10]),
-        print "{0:>7d}{1:>7d}{2:>7d}{3:>7d}{4:>7d}{5:>7d}{6:>7d}".format(*list(line)[10:17])
+        print "{0:>7.3f}{1:>7.3f}{2:>7d}{3:>7d}".format(float(line[0]), float(line[1]), int(line[2]), int(line[3])),
+        print "{0:>7d}{1:>7d}{2:>7d}{3:>7d}".format(int(line[4]),  int(line[5]),  int(line[6]),  int(line[7])),
+        print "{0:>7d}{1:>7d}{2:>7d}{3:>7d}".format(int(line[8]),  int(line[9]),  int(line[10]), int(line[11])),
+        print "{0:>7d}{1:>7d}{2:>7d}{3:>7d}".format(int(line[12]), int(line[13]), int(line[14]), int(line[15]))
 
 
 
