@@ -2,7 +2,7 @@
 desc = """amber.py
     Functions for primary analysis of AMBER trajectories
     Written by Karl Debiec on 12-12-01
-    Last updated 13-07-21"""
+    Last updated 13-10-07"""
 ########################################### MODULES, SETTINGS, AND DEFAULTS ############################################
 import commands, os, sys
 import numpy as np
@@ -15,12 +15,16 @@ def log(segment, time_offset = 0.0, **kwargs):
     dt          = float(commands.getoutput("grep dt     " + log).split()[2][:-1])
     length      = nstlim / ntpr
     with open(log, "r") as log:
-        raw     = [line.rstrip() for line in log.readlines()]
+        raw     = [line.strip() for line in log.readlines()]
     seg_attrs   = {}
     i           = 0
     data        = {}
+    data_loaded = False
+    
     while i < len(raw):
         line    = raw[i]
+        if   line.startswith("A V E R A G E S"):
+            data_loaded = True
         if   line.startswith("| Running AMBER/MPI version on"):
             line                    = line.split()
             seg_attrs["n_cores"]    = int(line[5])
@@ -32,10 +36,11 @@ def log(segment, time_offset = 0.0, **kwargs):
             seg_attrs["date"]       = "{0:02d}-{1:02d}-{2:02d}".format(int(line[3][8:]), int(line[3][:2]),
                                                                        int(line[3][3:5]))
             seg_attrs["time"]       = line[5]
-        elif line.startswith(" NSTEP"):
+        elif line.startswith("NSTEP") and not data_loaded:
             while True:
                 line    = raw[i]
-                if line.startswith(" Ewald error estimate:") or line.startswith("|E(PBS)"):  break
+                if line.startswith("------------------------------------------------------------------------------"):
+                    break
                 line    = line.split("=")
                 for j in range(1,len(line)):
                     if j == 1:                  field   = line[j-1].strip()
@@ -48,7 +53,7 @@ def log(segment, time_offset = 0.0, **kwargs):
                     else:               data[field]     = [value]
                 i      += 1
         i  += 1
-    data["TIME(PS)"]    = np.array(data["TIME(PS)"])[:-2]  / 1000. + time_offset
+    data["TIME(PS)"]    = np.array(data["TIME(PS)"])  / 1000. + time_offset
     dtype_line      = "np.dtype([('time', 'f4'),"
     log_line        = "[tuple(frame) for frame in np.column_stack((data['TIME(PS)'],"
     attrs_line      = "{'time units': 'ns',"
@@ -63,22 +68,33 @@ def log(segment, time_offset = 0.0, **kwargs):
                         ("VDWAALS",     "van der Waals"),
                         ("1-4 NB",      "van der Waals 1-4"),
                         ("EHBOND",      "hydrogen bond"),
-                        ("RESTRAINT",   "position restraint")]:
+                        ("RESTRAINT",   "position restraint"),
+                        ("EKCMT",       "center of mass motion kinetic"),
+                        ("VIRIAL",      "virial"),
+                        ("EPOLZ",       "polarization")]:
         if not (field in data): continue
-        data[field]     = np.array(data[field])[1:-1] * 0.239005736
+        data[field]     = np.array(data[field])
         dtype_line     += "('"     + dest  + "', 'f4'),"
         log_line       += "data['" + field + "'],"
         attrs_line     += "'"      + dest  + " units': 'kcal mol-1',"
     if "TEMP(K)" in data:
-        data["TEMP(K)"] = np.array(data["TEMP(K)"])[1:-1]
+        data["TEMP(K)"] = np.array(data["TEMP(K)"])
         dtype_line     += "('temperature', 'f4'),"
         log_line       += "data['TEMP(K)'],"
         attrs_line     += "'temperature units': 'K',"
     if "PRESS" in data:
-        data["PRESS"]   = np.array(data["PRESS"])[1:-1]
+        data["PRESS"]   = np.array(data["PRESS"])
         dtype_line     += "('pressure', 'f4'),"
         log_line       += "data['PRESS'],"
         attrs_line     += "'pressure units': 'bar',"
+    if "Dipole convergence: rms" in data:
+        data["Dipole convergence: rms"] = np.array(data["Dipole convergence: rms"])
+        dtype_line     += "('dipole converge rms', 'f4'),"
+        log_line       += "data['Dipole convergence: rms'],"
+    if "iters" in data:
+        data["iters"]   = np.array(data["iters"])
+        dtype_line     += "('iters', 'f4'),"
+        log_line       += "data['iters'],"
     dtype_line  = dtype_line[:-1]   + "])"
     log_line    = log_line[:-1]     + "))]"
     attrs_line  = attrs_line[:-1]   + "}"
