@@ -76,14 +76,14 @@ def analyze_primary_x(hdf5_filename, path, segment_lister, analyses, n_cores = 1
         for module_function, kwargs in analyses:
             module, function    = module_function.split(".")
             check_function      = getattr(sys.modules["primary_x." + module], "_check_" + function)
-            new_tasks           = check_function(hdf5_file, segments, **kwargs)
+            new_tasks           = check_function(hdf5_file = hdf5_file, segments = segments, **kwargs)
             if new_tasks:
                 task_list      += new_tasks
 
         print "{0} tasks to be completed for {1} segments using {2} cores".format(len(task_list), len(segments), n_cores)
         for function, kwargs in task_list:
             kwargs["n_cores"]   = n_cores
-            for result in function(segments, **kwargs):
+            for result in function(segments = segments, **kwargs):
                 if   len(result)  == 2: hdf5_file.add(result[0], result[1], **kwargs)
                 else:                   hdf5_file.add(result[0], result[1], **result[2])
 
