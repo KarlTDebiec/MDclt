@@ -100,43 +100,43 @@ def rate(hdf5_file,
     poi            *= dt
     Ka_se           = _P_bound_se_to_Ka_se(P_bound[-1], C_mol1_total, C_mol2_total, max_asym)
 
-    fpt_on      = []                                                    # Calculate kon and koff from first passage time
-    fpt_off     = []
-    for i in range(n_molecule_1):
-        for j in range(n_molecule_2):
-            trans_bound     = bound[:-1,i,j] - bound[1:,i,j]
-            enter_bound     = np.where(trans_bound  == -1)[0] + 1
-            enter_unbound   = np.where(trans_bound  ==  1)[0] + 1
-            if   enter_bound[0] < enter_unbound[0] and enter_bound[-1] < enter_unbound[-1]:
-                fpt_on     += [enter_bound[1:]   - enter_unbound[:-1]]
-                fpt_off    += [enter_unbound     - enter_bound]
-            elif enter_bound[0] < enter_unbound[0] and enter_bound[-1] > enter_unbound[-1]:
-                fpt_on     += [enter_bound[1:]   - enter_unbound]
-                fpt_off    += [enter_unbound     - enter_bound[:-1]]
-            elif enter_bound[0] > enter_unbound[0] and enter_bound[-1] < enter_unbound[-1]:
-                fpt_on     += [enter_bound       - enter_unbound[:-1]]
-                fpt_off    += [enter_unbound[1:] - enter_bound]
-            elif enter_bound[0] > enter_unbound[0] and enter_bound[-1] > enter_unbound[-1]:
-                fpt_on     += [enter_bound       - enter_unbound]
-                fpt_off    += [enter_unbound[1:] - enter_bound[:-1]]
-    fpt_on      = np.array(np.concatenate(fpt_on),  np.float32) * dt
-    fpt_off     = np.array(np.concatenate(fpt_off), np.float32) * dt
+#    fpt_on      = []                                                    # Calculate kon and koff from first passage time
+#    fpt_off     = []
+#    for i in range(n_molecule_1):
+#        for j in range(n_molecule_2):
+#            trans_bound     = bound[:-1,i,j] - bound[1:,i,j]
+#            enter_bound     = np.where(trans_bound  == -1)[0] + 1
+#            enter_unbound   = np.where(trans_bound  ==  1)[0] + 1
+#            if   enter_bound[0] < enter_unbound[0] and enter_bound[-1] < enter_unbound[-1]:
+#                fpt_on     += [enter_bound[1:]   - enter_unbound[:-1]]
+#                fpt_off    += [enter_unbound     - enter_bound]
+#            elif enter_bound[0] < enter_unbound[0] and enter_bound[-1] > enter_unbound[-1]:
+#                fpt_on     += [enter_bound[1:]   - enter_unbound]
+#                fpt_off    += [enter_unbound     - enter_bound[:-1]]
+#            elif enter_bound[0] > enter_unbound[0] and enter_bound[-1] < enter_unbound[-1]:
+#                fpt_on     += [enter_bound       - enter_unbound[:-1]]
+#                fpt_off    += [enter_unbound[1:] - enter_bound]
+#            elif enter_bound[0] > enter_unbound[0] and enter_bound[-1] > enter_unbound[-1]:
+#                fpt_on     += [enter_bound       - enter_unbound]
+#                fpt_off    += [enter_unbound[1:] - enter_bound[:-1]]
+#    fpt_on      = np.array(np.concatenate(fpt_on),  np.float32) * dt
+#    fpt_off     = np.array(np.concatenate(fpt_off), np.float32) * dt
 
-    C_one       = _concentration(1, volume)
-    kon_sim     = 1 / np.mean(fpt_on)
-    koff_sim    = 1 / np.mean(fpt_off)
-    kon_sim_se  = (kon_sim  ** 2 * np.std(fpt_on))  / np.sqrt(fpt_on.size)
-    koff_sim_se = (koff_sim ** 2 * np.std(fpt_off)) / np.sqrt(fpt_off.size)
-    kon         = kon_sim  / (C_one * C_one)
-    koff        = koff_sim /  C_one
-    kon_se      = kon  * (kon_sim_se  / kon_sim)
-    koff_se     = koff * (koff_sim_se / koff_sim)
+#    C_one       = _concentration(1, volume)
+#    kon_sim     = 1 / np.mean(fpt_on)
+#    koff_sim    = 1 / np.mean(fpt_off)
+#    kon_sim_se  = (kon_sim  ** 2 * np.std(fpt_on))  / np.sqrt(fpt_on.size)
+#    koff_sim_se = (koff_sim ** 2 * np.std(fpt_off)) / np.sqrt(fpt_off.size)
+#    kon         = kon_sim  / (C_one * C_one)
+#    koff        = koff_sim /  C_one
+#    kon_se      = kon  * (kon_sim_se  / kon_sim)
+#    koff_se     = koff * (koff_sim_se / koff_sim)
 
-    print fpt_on, np.mean(fpt_on)
-    print fpt_off, np.mean(fpt_off)
-    print kon, kon_se
-    print koff, koff_se
-    print kon / koff, kon / koff * np.sqrt((kon_se / kon) ** 2 + (koff_se / koff) ** 2)
+#    print fpt_on, np.mean(fpt_on)
+#    print fpt_off, np.mean(fpt_off)
+#    print kon, kon_se
+#    print koff, koff_se
+#    print kon / koff, kon / koff * np.sqrt((kon_se / kon) ** 2 + (koff_se / koff) ** 2)
 
     fpt_on      = []                                                    # Calculate kon and koff from first passage time
     fpt_off     = []
@@ -159,8 +159,8 @@ def rate(hdf5_file,
             fpt_off    += [enter_unbound[1:] - enter_bound[:-1]]
     fpt_on      = np.array(np.concatenate(fpt_on),  np.float32) * dt
     fpt_off     = np.array(np.concatenate(fpt_off), np.float32) * dt
-    print fpt_on, np.mean(fpt_on)
-    print fpt_off, np.mean(fpt_off)
+#    print fpt_on, np.mean(fpt_on)
+#    print fpt_off, np.mean(fpt_off)
 
     kon_sim     = 1 / np.mean(fpt_on)
     koff_sim    = 1 / np.mean(fpt_off)
@@ -170,6 +170,12 @@ def rate(hdf5_file,
     koff        = koff_sim /  C_mol1_total
     kon_se      = kon  * (kon_sim_se  / kon_sim)
     koff_se     = koff * (koff_sim_se / koff_sim)
+#    print np.mean(fpt_on), np.mean(fpt_off)
+#    print kon_sim, koff_sim
+#    print kon_sim_se, koff_sim_se
+#    print kon, koff
+#    print kon_se, koff_se
+#    print C_mol1_total, C_mol2_total
                                                                                 # Organize data for storage in hdf5
     attrs           = {"bound_cutoff": float(bound_cutoff), "unbound_cutoff": float(unbound_cutoff), "time": duration}
     Pbound_attrs    = {"Ka": float(Ka[-1]), "Ka se": Ka_se, "Ka units": "M-1"}
@@ -273,7 +279,7 @@ def pmf(hdf5_file,
 
     data    = np.array([tuple(frame) for frame in zip(bins[:-1], bins[1:], count, probability, free_energy, pmf)],
                        np.dtype([("lower bound", "f4"), ("upper bound", "f4"), ("count", "i4"),
-                                 ("probability", "f4"), ("free_energy", "f4"), ("pmf",   "f4")]))
+                                 ("probability", "f4"), ("free energy", "f4"), ("pmf",   "f4")]))
     attrs   = {"lower bound units": "A",          "upper bound units": "A",         "free energy units": "kBT",
                "pmf units":         "kcal mol-1", "temperature":       temperature, "zero_point" :        zero_point,
                "time":              duration}
