@@ -2,9 +2,9 @@
 desc = """hdf5_functions.py
     Class for simplifying interaction with HDF5 files
     Written by Karl Debiec on 13-02-03
-    Last updated 13-07-12"""
+    Last updated 13-10-10"""
 ########################################### MODULES, SETTINGS, AND DEFAULTS ############################################
-import commands, os, sys
+import commands, os, sys, types
 import h5py
 import numpy as np
 from   collections import OrderedDict
@@ -85,7 +85,7 @@ class HDF5_File:
         for subgroup in path:
             if   (subgroup in dict(group)): group = group[subgroup]
             else:                           group = group.create_group(subgroup)
-        if (type(data) == dict):
+        if (isinstance(data, types.DictType)):
             for key, value in data.iteritems():
                 try:        group[name].attrs[key]              = value
                 except:     group.create_group(name).attrs[key] = value

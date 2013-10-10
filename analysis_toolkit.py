@@ -83,7 +83,7 @@ def analyze_primary_x(hdf5_filename, path, segment_lister, analyses, n_cores = 1
         print "{0} tasks to be completed for {1} segments using {2} cores".format(len(task_list), len(segments), n_cores)
         for function, kwargs in task_list:
             kwargs["n_cores"]   = n_cores
-            for result in function(segments = segments, **kwargs):
+            for result in function(**kwargs):
                 if   len(result)  == 2: hdf5_file.add(result[0], result[1], **kwargs)
                 else:                   hdf5_file.add(result[0], result[1], **result[2])
 
