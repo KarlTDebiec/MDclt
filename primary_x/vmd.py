@@ -40,7 +40,8 @@ def com(segments, vmd = "vmd", selection = ["protein and name CA"], destination 
     yield (segments[int(segment_i)] + "/com" + destination, com)
     yield (segments[int(segment_i)] + "/com" + destination, attr)
     
-def _check_com(hdf5_file, segments, force = False, **kwargs):
+def _check_com(hdf5_file, force = False, **kwargs):
+    segments        = kwargs.get("segments",    [])
     destination     = kwargs.get("destination", "")
     if not (destination == "" or destination.startswith("_")):
         destination = "_" + destination
