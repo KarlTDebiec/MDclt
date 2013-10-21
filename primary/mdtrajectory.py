@@ -7,13 +7,25 @@ desc = """mdtrajectory.py
 import os, sys, json
 import numpy as np
 import mdtraj
+from standard_functions import topology_to_json
 ################################################## ANALYSIS FUNCTIONS ##################################################
 def coordinates(segment, **kwargs):
     trajectory  = mdtraj.load(segment.trajectory, top = segment.topology)
 
-    """
+    cell_lengths = trajectory.unitcell_lengths
+    cell_lengths_attr = {"units" : "degrees"}
 
-    """
+    cell_angles = trajectory.unitcell_angles
+    cell_angles_attr = {"units": "nanometers"}
+
+    coordinates = trajectory.xyz
+    coordinates_attr = {"units" : "nanometers"}
+
+    time = trajectory.time
+    time_attr = {"units": "picoseconds"}
+
+    topology = topology_to_json(trajectory.topology)
+    topology_attr = {"json": topology}
 
     return [(segment + "/cell_lengths", cell_lengths),
             (segment + "/cell_lengths", cell_lengths_attr),
@@ -23,8 +35,9 @@ def coordinates(segment, **kwargs):
             (segment + "/coordinates",  coordinates_attr),
             (segment + "/time",         time),
             (segment + "/time",         time_attr),
-            (segment + "/topology",     topology),
-            (segment + "/topology",     topology_attr)]
+            # (segment + "/topology",     topology),
+            (segment + "/topology",     topology_attr)
+            ]
 
 def _check_coordinates(hdf5_file, segment, force = False, **kwargs):
     if not (segment.topology   and os.path.isfile(segment.topology)
