@@ -23,7 +23,9 @@ def analyze_primary(hdf5_filename, path, segment_lister, analyses, n_cores = 1):
         2) Builds task list based on requested <analyses>, data present in <hdf5_filename>, and listed segments
         3) Distributes tasks across <n_cores> and writes results to <hdf5_filename> """
     print "Analyzing trajectory at {0}".format(path.replace("//","/"))
-    for module in set([m.split(".")[0] for m in [a[0] for a in analyses]]): import_module("primary." + module)
+    import_module("primary")
+    for module in set([m.split(".")[0] for m in [a[0] for a in analyses if a[0].find(".") != -1]]):
+        import_module("primary." + module)
     if   isinstance(segment_lister, types.FunctionType):
         segments    = segment_lister(path)
     elif isinstance(segment_lister, types.StringTypes):
@@ -36,8 +38,12 @@ def analyze_primary(hdf5_filename, path, segment_lister, analyses, n_cores = 1):
         check_functions = {}
         task_list       = []
         for module_function, kwargs in analyses:
-            module, function                    = module_function.split(".")
-            check_functions[module_function]    = getattr(sys.modules["primary." + module], "_check_" + function)
+            if module_function.find(".") != -1:
+                module, function                    = module_function.split(".")
+                check_functions[module_function]    = getattr(sys.modules["primary." + module], "_check_" + function)
+            else:
+                function                            = module_function
+                check_functions[module_function]    = getattr(sys.modules["primary"],           "_check_" + function)
         for segment in segments:
             for module_function, kwargs in analyses:
                 check_function  = check_functions[module_function]
@@ -62,7 +68,9 @@ def analyze_primary_x(hdf5_filename, path, segment_lister, analyses, n_cores = 1
         3) Completes tasks in serial, using <n_cores> for each task (if implemented), and writes results to
            <hdf5_filename> """
     print "Analyzing trajectory at {0}".format(path.replace("//","/"))
-    for module in set([m.split(".")[0] for m in [a[0] for a in analyses]]): import_module("primary_x." + module)
+    import_module("primary_x")
+    for module in set([m.split(".")[0] for m in [a[0] for a in analyses if a[0].find(".") != -1]]):
+        import_module("primary_x." + module)
     if   isinstance(segment_lister, types.FunctionType):
         segments    = segment_lister(path)
     elif isinstance(segment_lister, types.StringTypes):
@@ -74,8 +82,12 @@ def analyze_primary_x(hdf5_filename, path, segment_lister, analyses, n_cores = 1
     with HDF5_File(hdf5_filename) as hdf5_file:
         task_list   = []
         for module_function, kwargs in analyses:
-            module, function    = module_function.split(".")
-            check_function      = getattr(sys.modules["primary_x." + module], "_check_" + function)
+            if module_function.find(".") != -1:
+                module, function    = module_function.split(".")
+                check_function      = getattr(sys.modules["primary_x." + module], "_check_" + function)
+            else:
+                function            = module_function
+                check_function      = getattr(sys.modules["primary_x"],           "_check_" + function)
             new_tasks           = check_function(hdf5_file = hdf5_file, segments = segments, **kwargs)
             if new_tasks:
                 task_list      += new_tasks
