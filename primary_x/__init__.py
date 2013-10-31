@@ -37,8 +37,9 @@ def com_unwrap(segments, side_length, destination, **kwargs):
 #                for atom in frame:
 #                    outfile.write("  C {0:>16.6f}{1:>16.6f}{2:>16.6f}\n".format(*atom))
 def _check_com_unwrap(hdf5_file, source = "com", force = False, **kwargs):
-    segments    = kwargs.get("segments", [])
+    segments              = kwargs.get("segments", [])
     kwargs["destination"] = destination = kwargs.get("destination", "com_unwrap")
+    kwargs["side_length"] = kwargs.get("side_length", hdf5_file["{0}/log".format(segments[0])]["volume"][0] ** (1.0/3.0))
     expected    = [s + "/" + destination for s in segments if  s.topology   and os.path.isfile(s.topology)
                                                            and s.trajectory and os.path.isfile(s.trajectory)]
     if (force
