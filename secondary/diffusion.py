@@ -255,11 +255,10 @@ def translation(hdf5_file,
     n_selections    = com.shape[1]
     selection_attr  = " ".join(["\"{0}\"".format(sel) for sel in selection])
     D_table         = []
-    dtype_string    = "np.dtype([('delta t', 'f4')"
+    dtype           = [("delta t", "f4")]
     for i, selection in enumerate(selection):
-        if explicit_names:  dtype_string   += ",('{0} D', 'f4'), ('{0} D se', 'f4')".format(selection)
-        else:               dtype_string   += ",('{0} D', 'f4'), ('{0} D se', 'f4')".format(i)
-    dtype_string   += "])"
+        if explicit_names:  dtype  += [("{0} D".format(selection), "f4"), ("{0} D se".format(selection), "f4")]
+        else:               dtype  += [("{0} D".format(selection), "f4"), ("{0} D se".format(selection), "f4")]
     attrs   = {"time": time[-1], "delta t units": "ns", "D units": "A2 ps-1", "selection": selection_attr}
 
     def calc_D_block(dr_2, delta_t): return  np.mean(dr_2, axis = 1) / (6 * delta_t)
@@ -278,7 +277,7 @@ def translation(hdf5_file,
             D_table[-1]    += [np.mean(dr_2[:,j], axis = 0) / (6 * delta_t) / 1000.0, max_asym / 1000.0]
     for i in xrange(len(D_table)):
         D_table[i]          = tuple(D_table[i])
-    D_table                 = np.array(D_table, eval(dtype_string))
+    D_table                 = np.array(D_table, np.dtype(dtype))
 
     if verbose:     _print_translation(D_table, attrs)
     return  [("diffusion/translation" + destination, D_table),
@@ -292,6 +291,7 @@ def _check_translation(hdf5_file, force = False, **kwargs):
     selection           = hdf5_file.attrs("0000/com" + destination)["selection"].split("\" \"")
     selection           = [sel.strip("\"") for sel in selection]
     kwargs["selection"] = selection
+
     hdf5_file.load("*/log", type = "table")
     hdf5_file.load("*/com" + destination)
 
@@ -308,9 +308,17 @@ def _check_translation(hdf5_file, force = False, **kwargs):
     elif verbose:   _print_translation(data, attrs)
     return False
 def _print_translation(data, attrs):
+    selection   = [sel.strip("\"") for sel in attrs["selection"].split("\" \"")]
     print "DURATION {0:5d} ns".format(int(attrs["time"]))
-    print "DELTA_T  D        D se"
+    print "DELTA_T  ",
+    for sel in selection:
+        print "{0:<9}{1:<9}".format(sel, "(se)"),
+    print
     for line in data:
-        print "{0:7.3f}  {1:7.5f}  {2:7.5f}".format(float(line[0]), float(line[1]), float(line[2]))
-
+        print "{0:<9.3f}".format(float(line[0])),
+        for i, sel in enumerate(selection):
+            print "{0:<9.5f}({1:7.5f})".format(float(line[i*2+1]), float(line[i*2+2])),
+        print
+#        line  = np.array([line[i] for i in range(len(line.dtype))], np.float32)
+#        print "{0:9.5f} {1:9.5f} {2:9.5f} {3:9.5f}".format(float(line[1]), float(line[2]), float(np.mean(line[3::2])), float(np.std(line[3::2])))
 

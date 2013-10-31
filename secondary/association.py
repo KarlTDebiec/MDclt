@@ -2,10 +2,11 @@
 desc = """association.py
     Functions for secondary analysis of molecular association
     Written by Karl Debiec on 12-08-15
-    Last updated 13-09-18"""
+    Last updated 13-10-21"""
 ########################################### MODULES, SETTINGS, AND DEFAULTS ############################################
-import os, sys, time, types
+import os, sys, time, types, warnings
 import numpy as np
+from   scipy.optimize import fmin
 from   standard_functions import block_average, fit_curve
 ################################################## INTERNAL FUNCTIONS ##################################################
 def _concentration(n, volume): return float(n) / 6.0221415e23 / volume
@@ -13,10 +14,18 @@ def _P_bound_to_Ka(P_bound, C_mol1_total, C_mol2_total):
     C_complex       = P_bound * np.min(C_mol1_total, C_mol2_total)
     C_mol1_unbound  = C_mol1_total - C_complex
     C_mol2_unbound  = C_mol2_total - C_complex
-    return            C_complex / (C_mol1_unbound * C_mol2_unbound)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        return            C_complex / (C_mol1_unbound * C_mol2_unbound)
 def _P_bound_se_to_Ka_se(P_bound, C_mol1_total, C_mol2_total, P_bound_se):
     return np.sqrt((((C_mol2_total - C_mol1_total * P_bound ** 2) * P_bound_se) /
                     ((P_bound - 1) ** 2 * (C_mol1_total * P_bound - C_mol2_total) ** 2)) ** 2)
+def _Ka_to_P_bound(Ka, C_mol1_total, C_mol2_total):
+    def model_function(P_bound, Ka, C_mol1_total, C_mol2_total):
+        C_min   = np.min(C_mol1_total, C_mol2_total)
+        return (((P_bound * C_min)/((C_mol1_total - P_bound * C_min) * (C_mol2_total - P_bound * C_min))) - Ka) ** 2
+    P_bound     = fmin(func = model_function, x0 = 0.1, args = (Ka, C_mol1_total, C_mol2_total), disp = False)
+    return P_bound
 ################################################ PRIMARY DATA FUNCTIONS ################################################
 def _load_association_pmf(self, path, bins, **kwargs):
     data            = np.zeros(bins.size - 1, np.int32)
@@ -42,12 +51,14 @@ def _load_association_distance_histogram(self, path, bins, **kwargs):
 ################################################## ANALYSIS FUNCTIONS ##################################################
 def rate(hdf5_file,
          pcoord,                                            # Progress coordinate name
-         volume,                                            # System volume
-         source,                                            # Progress Coordinate key within hdf5_file.data
+         volume,                                            # System volume (L)
+         source,                                            # Progress coordinate key within hdf5_file.data
          destination,                                       # Analysis output destination within hdf5 file
          bound_cutoff   = 3.2,                              # Bound cutoff (A)
          unbound_cutoff = 3.2,                              # Unbound cutoff (A)
-         verbose        = False, n_cores = 1, **kwargs):
+         n_molecule_1   = 1,                                # Number of molecules of type 1
+         n_molecule_2   = 1,                                # Number of molecules of type 2
+         verbose        = True, n_cores = 1, **kwargs):
     """ Calculates Ka, kon, and koff of two sets of molecules along <pcoord> in a box of <volume> with the bound state
         defined as <pcoord> below <bound_cutoff> and the unbound state defined as <pcoord> above <unbound_cutoff>.
         Standard error is estimated using the blocking method of Flyvbjerg, H., and Petersen, H. G. Error Estimates on
@@ -56,8 +67,6 @@ def rate(hdf5_file,
     raw_data        = hdf5_file.data[source]
     duration        = time[-1]
     dt              = time[1] - time[0]
-    n_molecule_1    = raw_data.shape[1]
-    n_molecule_2    = raw_data.shape[2]
     C_mol1_total    = _concentration(n_molecule_1, volume)
     C_mol2_total    = _concentration(n_molecule_2, volume)
 
@@ -66,27 +75,25 @@ def rate(hdf5_file,
     bound[raw_data < bound_cutoff]      = 1
     unbound[raw_data > unbound_cutoff]  = 1
     for i in xrange(n_molecule_1):
-        for j in xrange(n_molecule_2):
-            trans_bound     =   bound[1:,i,j] -   bound[:-1,i,j]
-            trans_unbound   = unbound[1:,i,j] - unbound[:-1,i,j]
-            enter_bound     = np.where(trans_bound   == 1)[0] + 1
-            enter_unbound   = np.where(trans_unbound == 1)[0] + 1
-            try:    enter   = enter_bound[0]                            # Start at first entrance of bound state
-            except: continue                                            # Pair never enters bound state
-            while True:
-                try:                                                    # Look for next entrance of unbound state
-                    exit    = enter_unbound[enter_unbound > enter][0]   #   Next entrance found
-                    bound[enter:exit,i,j]   = 1                         #   Set state to bound between entrances
-                except:                                                 # Trajectory ends with pair in bound state
-                    bound[enter::,i,j]      = 1                         #   Set state to bound until end of trajectory
-                    break                                               #   Exit
-                try:                                                    # Look for next entrance of bound state
-                    enter   = enter_bound[enter_bound > exit][0]        #   Next entrance found
-                except:                                                 # Trajectory ends with pair in unbound state
-                    break                                               #   Exit
+        trans_bound     =   bound[1:,i] -   bound[:-1,i]
+        trans_unbound   = unbound[1:,i] - unbound[:-1,i]
+        enter_bound     = np.where(trans_bound   == 1)[0] + 1
+        enter_unbound   = np.where(trans_unbound == 1)[0] + 1
+        try:    enter   = enter_bound[0]                                # Start at first entrance of bound state
+        except: continue                                                # Pair never enters bound state
+        while True:
+            try:                                                        # Look for next entrance of unbound state
+                exit    = enter_unbound[enter_unbound > enter][0]       #   Next entrance found
+                bound[enter:exit,i]   = 1                               #   Set state to bound between entrances
+            except:                                                     # Trajectory ends with pair in bound state
+                bound[enter::,i]      = 1                               #   Set state to bound until end of trajectory
+                break                                                   #   Exit
+            try:                                                        # Look for next entrance of bound state
+                enter   = enter_bound[enter_bound > exit][0]            #   Next entrance found
+            except:                                                     # Trajectory ends with pair in unbound state
+                break                                                   #   Exit
 
-                                                                        # Calculate Ka(P_bound, time) for convergence
-    n_bound  = np.array(np.sum(np.any(bound[:], axis = 2), axis = 1), np.float)
+    n_bound  = np.array(np.sum(bound, axis = 1), np.float)              # Calculate Ka(P_bound, time) for convergence
     P_bound  = n_bound.copy()
     for i in xrange(1, time.size):
         P_bound[i] += P_bound[i-1]
@@ -100,49 +107,10 @@ def rate(hdf5_file,
     poi            *= dt
     Ka_se           = _P_bound_se_to_Ka_se(P_bound[-1], C_mol1_total, C_mol2_total, max_asym)
 
-#    fpt_on      = []                                                    # Calculate kon and koff from first passage time
-#    fpt_off     = []
-#    for i in range(n_molecule_1):
-#        for j in range(n_molecule_2):
-#            trans_bound     = bound[:-1,i,j] - bound[1:,i,j]
-#            enter_bound     = np.where(trans_bound  == -1)[0] + 1
-#            enter_unbound   = np.where(trans_bound  ==  1)[0] + 1
-#            if   enter_bound[0] < enter_unbound[0] and enter_bound[-1] < enter_unbound[-1]:
-#                fpt_on     += [enter_bound[1:]   - enter_unbound[:-1]]
-#                fpt_off    += [enter_unbound     - enter_bound]
-#            elif enter_bound[0] < enter_unbound[0] and enter_bound[-1] > enter_unbound[-1]:
-#                fpt_on     += [enter_bound[1:]   - enter_unbound]
-#                fpt_off    += [enter_unbound     - enter_bound[:-1]]
-#            elif enter_bound[0] > enter_unbound[0] and enter_bound[-1] < enter_unbound[-1]:
-#                fpt_on     += [enter_bound       - enter_unbound[:-1]]
-#                fpt_off    += [enter_unbound[1:] - enter_bound]
-#            elif enter_bound[0] > enter_unbound[0] and enter_bound[-1] > enter_unbound[-1]:
-#                fpt_on     += [enter_bound       - enter_unbound]
-#                fpt_off    += [enter_unbound[1:] - enter_bound[:-1]]
-#    fpt_on      = np.array(np.concatenate(fpt_on),  np.float32) * dt
-#    fpt_off     = np.array(np.concatenate(fpt_off), np.float32) * dt
-
-#    C_one       = _concentration(1, volume)
-#    kon_sim     = 1 / np.mean(fpt_on)
-#    koff_sim    = 1 / np.mean(fpt_off)
-#    kon_sim_se  = (kon_sim  ** 2 * np.std(fpt_on))  / np.sqrt(fpt_on.size)
-#    koff_sim_se = (koff_sim ** 2 * np.std(fpt_off)) / np.sqrt(fpt_off.size)
-#    kon         = kon_sim  / (C_one * C_one)
-#    koff        = koff_sim /  C_one
-#    kon_se      = kon  * (kon_sim_se  / kon_sim)
-#    koff_se     = koff * (koff_sim_se / koff_sim)
-
-#    print fpt_on, np.mean(fpt_on)
-#    print fpt_off, np.mean(fpt_off)
-#    print kon, kon_se
-#    print koff, koff_se
-#    print kon / koff, kon / koff * np.sqrt((kon_se / kon) ** 2 + (koff_se / koff) ** 2)
-
-    fpt_on      = []                                                    # Calculate kon and koff from first passage time
+    fpt_on      = []                                                            # Calculate mean first passage time
     fpt_off     = []
-    any_bound   = np.array(np.any(bound, axis = 2), np.int8)
     for i in range(n_molecule_1):
-        trans_bound     = any_bound[:-1,i] - any_bound[1:,i]
+        trans_bound     = bound[:-1,i] - bound[1:,i]
         enter_bound     = np.where(trans_bound  == -1)[0] + 1
         enter_unbound   = np.where(trans_bound  ==  1)[0] + 1
         if   enter_bound[0] < enter_unbound[0] and enter_bound[-1] < enter_unbound[-1]:
@@ -159,10 +127,8 @@ def rate(hdf5_file,
             fpt_off    += [enter_unbound[1:] - enter_bound[:-1]]
     fpt_on      = np.array(np.concatenate(fpt_on),  np.float32) * dt
     fpt_off     = np.array(np.concatenate(fpt_off), np.float32) * dt
-#    print fpt_on, np.mean(fpt_on)
-#    print fpt_off, np.mean(fpt_off)
 
-    kon_sim     = 1 / np.mean(fpt_on)
+    kon_sim     = 1 / np.mean(fpt_on)                                           # Calculate kon, koff, and Ka
     koff_sim    = 1 / np.mean(fpt_off)
     kon_sim_se  = (kon_sim  ** 2 * np.std(fpt_on))  / np.sqrt(fpt_on.size)
     koff_sim_se = (koff_sim ** 2 * np.std(fpt_off)) / np.sqrt(fpt_off.size)
@@ -170,12 +136,6 @@ def rate(hdf5_file,
     koff        = koff_sim /  C_mol1_total
     kon_se      = kon  * (kon_sim_se  / kon_sim)
     koff_se     = koff * (koff_sim_se / koff_sim)
-#    print np.mean(fpt_on), np.mean(fpt_off)
-#    print kon_sim, koff_sim
-#    print kon_sim_se, koff_sim_se
-#    print kon, koff
-#    print kon_se, koff_se
-#    print C_mol1_total, C_mol2_total
                                                                                 # Organize data for storage in hdf5
     attrs           = {"bound_cutoff": float(bound_cutoff), "unbound_cutoff": float(unbound_cutoff), "time": duration}
     Pbound_attrs    = {"Ka": float(Ka[-1]), "Ka se": Ka_se, "Ka units": "M-1"}
@@ -191,6 +151,7 @@ def rate(hdf5_file,
                        "Ka units": "M-1",  "kon units": "M-2 ns-1", "koff units": "M-1 ns-1"}
 
     if verbose:        _print_rate(pcoord, attrs, Pbound_attrs, fpt_attrs)
+    if destination == "DO_NOT_STORE": return []
     return  [(destination + "/Pbound/Ka",       Ka),
              (destination + "/Pbound/Ka",       {"time units": "ns", "Ka units": "M-1"}),
              (destination + "/Pbound/block",    block),
@@ -205,28 +166,40 @@ def rate(hdf5_file,
 def _check_rate(hdf5_file, force = False, **kwargs):
     """ Determines whether or not to run 'association.rate' based on settings and data present in hdf5 file, and loads
         necessary primary data. 'source' and destination' may be set manually, but may also be guessed from pcoord. """
-    pcoord          = kwargs.get("pcoord")
-    source          = kwargs.pop("source",      "*/association_" + pcoord)
-    destination     = kwargs.get("destination",   "association/" + pcoord)
-    verbose         = kwargs.get("verbose",     False)
+    def _load_association(self, path, **loader_kwargs):
+        segments                = self._segments()
+        shapes                  = np.array([self.hierarchy[segment + "/" + path[2:]].shape for segment in segments])
+        kwargs["n_molecule_1"]  = shapes[0, 1]
+        kwargs["n_molecule_2"]  = shapes[0, 2]
+        data                    = np.zeros((np.sum(shapes[:,0]), kwargs["n_molecule_1"]), np.float32)
+        i                       = 0
+        for j, segment in enumerate(segments):
+            data[i:i+shapes[j,0]]   = np.min(self[segment + "/" + path[2:]], axis = 2)
+            i                      += shapes[j,0]
+        return data
+    pcoord      = kwargs.get("pcoord")
+    source      = kwargs.pop("source",      "*/association_" + pcoord)
+    destination = kwargs.get("destination",  "/association/" + pcoord)
+    verbose     = kwargs.get("verbose",     True)
 
-    duration                = hdf5_file.load("*/log", type = "table")["time"][-1]
-    kwargs["volume"]        = np.mean(hdf5_file.data["*/log"]["volume"])*1e-27  #   (A^3 > L)
-    kwargs["source"]        = source
-    kwargs["destination"]   = destination
+    duration        = hdf5_file.load("*/log", type = "table")["time"][-1]
+    if "volume" in kwargs:  volume  = kwargs["volume"]
+    else:                   volume  = np.mean(hdf5_file.data["*/log"]["volume"]) * 1e-27
 
+    kwargs      = dict(kwargs.items() + {"source": source, "destination": destination, "volume": volume}.items())
     expected    = [destination + "/Pbound", destination + "/Pbound/Ka", destination + "/Pbound/block",
                    destination + "/fpt",    destination + "/fpt/on",    destination + "/fpt/off"]
+
     if     (force                                                               # Run analysis if forced or analysis has
     or not (expected in hdf5_file)):                                            #   not previously been run
-        hdf5_file.load(source)
+        hdf5_file.load(source, loader = _load_association)
         return [(rate, kwargs)]
 
     attrs   = hdf5_file.attrs(destination)
     if ((attrs["bound_cutoff"]   != kwargs.get("bound_cutoff",   3.2))          # Run analysis if it has been run
     or  (attrs["unbound_cutoff"] != kwargs.get("unbound_cutoff", 3.2))          #   previously, but with different
     or  (attrs["time"]           != duration)):                                 #   settings or trajectory duration
-        hdf5_file.load(source)
+        hdf5_file.load(source, loader = _load_association)
         return [(rate, kwargs)]
     if verbose:                                                                 # Do not run analysis
         Pbound_attrs    = hdf5_file.attrs(destination + "/Pbound")
