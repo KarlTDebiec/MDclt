@@ -86,6 +86,8 @@ class HDF5_File:
             if   (subgroup in dict(group)): group = group[subgroup]
             else:                           group = group.create_group(subgroup)
         if (isinstance(data, types.DictType)):
+            for key in group[name].attrs.keys():
+                del group[name].attrs[key]
             for key, value in data.iteritems():
                 try:        group[name].attrs[key]              = value
                 except:     group.create_group(name).attrs[key] = value
