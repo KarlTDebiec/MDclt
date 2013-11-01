@@ -105,13 +105,14 @@ def analyze_secondary(hdf5_filename, analyses, n_cores = 1):
         2) Completes tasks in serial, using <n_cores> for each task (if implemented), and writes results to
            <hdf5_filename> """
     print "Analyzing file {0}".format(hdf5_filename.replace("//","/"))
-    for module in set([m for m in [a.split(".")[0] for a in [a[0] for a in analyses]] if m != "custom"]):
+    for module in set([m for m in [".".join(a.split(".")[:-1]) for a in [a[0] for a in analyses]] if m != "custom"]):
         import_module("secondary." + module)
 
     with HDF5_File(hdf5_filename) as hdf5_file:
         task_list   = []
         for module_function, kwargs in analyses:
-            module, function    = module_function.split(".")
+            module      = ".".join(module_function.split(".")[:-1])
+            function    = module_function.split(".")[-1]
             if module != "custom":
                 check_function  = getattr(sys.modules["secondary." + module], "_check_" + function)
             else:

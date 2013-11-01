@@ -8,11 +8,12 @@ import os, sys, types
 import numpy as np
 import mdtraj
 ################################################## ANALYSIS FUNCTIONS ##################################################
-def com_unwrap(segments, side_length, destination, **kwargs):
+def com_unwrap(segments, side_length, destination, debug_xyz = False, **kwargs):
     inner_cutoff    = side_length / 4
     final_sign      = None
     final_offset    = None
-#    with open("test.xyz", "w") as outfile:
+    if debug_xyz:
+        outfile = open("test.xyz", "w")
     for segment in segments:
         sign            = np.sign(segment.com)
         delta_sign      = np.zeros(sign.shape)
@@ -31,11 +32,14 @@ def com_unwrap(segments, side_length, destination, **kwargs):
         final_offset    = offset[-1]
         final           = segment.com + offset
         yield (segment + "/" + destination, segment.com + offset)
-#            for frame in final:
-#                outfile.write("{0}\n".format(final.shape[1]))
-#                outfile.write("test\n")
-#                for atom in frame:
-#                    outfile.write("  C {0:>16.6f}{1:>16.6f}{2:>16.6f}\n".format(*atom))
+        if debug_xyz:
+            for frame in final:
+                outfile.write("{0}\n".format(final.shape[1]))
+                outfile.write("test\n")
+                for atom in frame:
+                    outfile.write("  C {0:>16.6f}{1:>16.6f}{2:>16.6f}\n".format(*atom))
+    if debug_xyz:
+        outfile.close()
 def _check_com_unwrap(hdf5_file, source = "com", force = False, **kwargs):
     segments              = kwargs.get("segments", [])
     kwargs["destination"] = destination = kwargs.get("destination", "com_unwrap")

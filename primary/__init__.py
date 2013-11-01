@@ -15,8 +15,6 @@ def com_resname(segment, destination, resname, **kwargs):
     indexes     = []
     masses      = []
     total_mass  = []
-    import time
-    start   = time.time()
     for name in resname:
         for i, res in enumerate(trj.topology.residues, 1):
             if res.name == name:
