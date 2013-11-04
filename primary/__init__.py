@@ -17,6 +17,7 @@ def com_resname(segment, destination, resname, **kwargs):
     indexes     = []
     masses      = []
     total_mass  = []
+    
     for name in resname:
         for i, res in enumerate(trj.topology.residues, 1):
             if res.name == name:
@@ -36,11 +37,13 @@ def _check_com_resname(hdf5_file, segment, force = False, **kwargs):
     if not (segment.topology   and os.path.isfile(segment.topology)
     and     segment.trajectory and os.path.isfile(segment.trajectory)):
             return False
-    destination = kwargs.get("destination", "com")
-    resname     = kwargs.get("resname",     "")
+    kwargs["destination"] = destination = kwargs.get("destination", "com")
+    kwargs["resname"]     = resname     = kwargs.get("resname",     ["HOH"])
     if isinstance(resname, types.StringType):
-        resname   = [resname]
+        kwargs["resname"] = [resname]
     if    (force
     or not segment + "/" + destination in hdf5_file):
             return [(com_resname, segment, kwargs)]
     else:   return False
+
+

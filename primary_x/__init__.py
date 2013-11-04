@@ -11,8 +11,8 @@ def com_unwrap(segments, side_length, destination, debug_xyz = False, **kwargs):
     inner_cutoff    = side_length / 4
     final_sign      = None
     final_offset    = None
-    if debug_xyz:
-        outfile = open("test.xyz", "w")
+    if debug_xyz   != False:
+        outfile     = open(debug_xyz, "w")
     for segment in [s for s in segments if hasattr(s, "com")]:
         sign            = np.sign(segment.com)
         delta_sign      = np.zeros(sign.shape)
