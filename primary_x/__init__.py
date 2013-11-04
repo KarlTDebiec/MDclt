@@ -2,11 +2,10 @@
 desc = """__init__.py
     Functions for primary cross-segment analysis of MD trajectories
     Written by Karl Debiec on 13-10-30
-    Last updated 13-10-31"""
+    Last updated 13-11-02"""
 ########################################### MODULES, SETTINGS, AND DEFAULTS ############################################
 import os, sys, types
 import numpy as np
-import mdtraj
 ################################################## ANALYSIS FUNCTIONS ##################################################
 def com_unwrap(segments, side_length, destination, debug_xyz = False, **kwargs):
     inner_cutoff    = side_length / 4
@@ -14,7 +13,7 @@ def com_unwrap(segments, side_length, destination, debug_xyz = False, **kwargs):
     final_offset    = None
     if debug_xyz:
         outfile = open("test.xyz", "w")
-    for segment in segments:
+    for segment in [s for s in segments if hasattr(s, "com")]:
         sign            = np.sign(segment.com)
         delta_sign      = np.zeros(sign.shape)
         delta_sign[1:]  = sign[1:] - sign[:-1]
@@ -42,10 +41,11 @@ def com_unwrap(segments, side_length, destination, debug_xyz = False, **kwargs):
         outfile.close()
 def _check_com_unwrap(hdf5_file, source = "com", force = False, **kwargs):
     segments              = kwargs.get("segments", [])
+    segments              = [s for s in segments if  s.topology   and os.path.isfile(s.topology)
+                                                 and s.trajectory and os.path.isfile(s.trajectory)]
     kwargs["destination"] = destination = kwargs.get("destination", "com_unwrap")
     kwargs["side_length"] = kwargs.get("side_length", hdf5_file["{0}/log".format(segments[0])]["volume"][0] ** (1.0/3.0))
-    expected    = [s + "/" + destination for s in segments if  s.topology   and os.path.isfile(s.topology)
-                                                           and s.trajectory and os.path.isfile(s.trajectory)]
+    expected              = [s + "/" + destination for s in segments]
     if (force
     or  not expected in hdf5_file):
         for segment in segments:

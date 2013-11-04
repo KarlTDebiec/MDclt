@@ -4,9 +4,11 @@ desc = """__init__.py
     Written by Karl Debiec on 13-10-30
     Last updated 13-10-30"""
 ########################################### MODULES, SETTINGS, AND DEFAULTS ############################################
-import os, sys, types
+import os, sys, types, warnings
 import numpy as np
-import mdtraj
+with warnings.catch_warnings():
+    warnings.simplefilter("ignore")
+    import mdtraj
 import scipy.spatial.distance as ssd
 ################################################## ANALYSIS FUNCTIONS ##################################################
 def com_resname(segment, destination, resname, **kwargs):

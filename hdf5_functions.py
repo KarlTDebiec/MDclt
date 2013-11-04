@@ -94,8 +94,7 @@ class HDF5_File:
         else:
             if (name in dict(group)): del group[name]
             group.create_dataset(name, data = data, **data_kwargs)
-            if verbose:
-                print "    {0:25} added".format("/".join(path + [name]))
+            print "    {0:25} added".format("/".join(path + [name]))
     def load(self, path, destination = None, type = "array", **kwargs):
         if not destination: destination  = path
         if not self.file:   self._open_file()

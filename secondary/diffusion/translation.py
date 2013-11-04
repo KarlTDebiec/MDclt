@@ -2,21 +2,21 @@
 desc = """translation.py
     Functions for analysis of translational diffusion
     Written by Karl Debiec on 13-02-08
-    Last updated 13-10-31"""
+    Last updated 13-11-01"""
 ########################################### MODULES, SETTINGS, AND DEFAULTS ############################################
-import os, sys, warnings
-import time as time_module
+import os, sys
 import numpy as np
 from   collections import OrderedDict
 ################################################## ANALYSIS FUNCTIONS ##################################################
 def small_molecule(hdf5_file,
-                   time,                                    # Time
-                   com,                                     # Centers of mass of each molecule of each residue type
-                   delta_ts,                                # Delta_t(s) (ns)
-                   destination,                             # Destination of secondary data
-                   selection,                               # Residue types and numbers for each molecule
-                   verbose = False, n_cores = 1, **kwargs):
-    size        = time.size
+        time,                                               # Simulation time
+        com,                                                # Centers of mass of each molecule of each residue type
+        delta_ts,                                           # Delta_t(s) (ns)
+        selection,                                          # Residue types and numbers for each molecule
+        destination,                                        # Destination of secondary data
+        verbose = False, n_cores = 1, **kwargs):
+
+    # Prepare residue types and indexes
     dt          = time[1] - time[0]
     dtype       = [("delta t", "f4")]
     res_indexes = OrderedDict()
@@ -26,47 +26,59 @@ def small_molecule(hdf5_file,
         res_indexes[resname]    = np.array(res_indexes[resname])
         dtype                  += [("{0} D ({1})".format(resname, res_indexes[resname].size), "f4")]
         dtype                  += [("{0} D se".format(resname), "f4")]
-    table   = []
-    attrs   = {"time": "{0:.3f} {1:.3f}".format(time[0], time[-1]), "delta t units": "ns", "D units": "A2 ps-1"}
+
+    # Calculate translational diffusion
+    data    = []
     for delta_t in delta_ts:
-        table          += [[delta_t]]
+        data           += [[delta_t]]
         delta_t_index   = int(np.round(delta_t / dt))
         delta_xyz_2     = np.sum((com[delta_t_index:] - com[:-delta_t_index]) ** 2, axis = 2)
         D               = np.mean(delta_xyz_2, axis = 0) / (6 * delta_t) / 1000.0
         for res, indexes in res_indexes.iteritems():
-            table[-1]  += [np.mean(D[indexes]), np.std(D[indexes])]
-    table   = np.array([tuple(D) for D in table], np.dtype(dtype))
-    if verbose:     _print_small_molecule(table, attrs)
-    return  [(destination, table),
+            data[-1]   += [np.mean(D[indexes]), np.std(D[indexes])]
+
+    # Organize and return data
+    data    = np.array([tuple(D) for D in data], np.dtype(dtype))
+    attrs   = {"time": "{0:.3f} {1:.3f}".format(float(time[0]), float(time[-1])),
+               "delta t units": "ns", "D units": "A2 ps-1"}
+    if verbose:     _print_small_molecule(data, attrs)
+    return  [(destination, data),
              (destination, attrs)]
 def _check_small_molecule(hdf5_file, force = False, **kwargs):
-    def _ignore_time(time, dataset, ignore):
-        if   ignore <  0:     return dataset[time > time[-1] + ignore - (time[1] - time[0])]
-        elif ignore == 0:     return dataset
-        elif ignore >  0:     return dataset[time > ignore]
-    source                  = kwargs.get("source", "*/com_unwrap")
-    ignore                  = kwargs.get("ignore", 0)
-    kwargs["delta_ts"]      = delta_ts    = kwargs.get("delta_ts",    np.array([0.1]))
-    kwargs["destination"]   = destination = kwargs.get("destination", "/diffusion/translation")
-    kwargs["selection"]     = hdf5_file.attrs("0000/com")["resname"]
+    def _ignore_index(time, ignore):
+        if   ignore <  0:   return np.where(time > time[-1] + ignore - (time[1] - time[0]))[0][0]
+        elif ignore == 0:   return 0
+        elif ignore >  0:   return np.where(time > ignore)[0][0]
 
-    if (force
-    or not(destination in hdf5_file)):
-        time  = hdf5_file.load("*/log", type = "table")["time"]
-        com   = hdf5_file.load(source if source.startswith("*/") else "*/" + source)
-        kwargs["time"]  = _ignore_time(time, time, ignore)
-        kwargs["com"]   = _ignore_time(time, com,  ignore)
+    # Parse kwargs and set defaults
+    source                              = kwargs.get("source",      "*/com_unwrap")
+    source                              = source if source.startswith("*/") else "*/" + source
+    ignore                              = kwargs.pop("ignore",      0)
+    kwargs["delta_ts"]    = delta_ts    = kwargs.get("delta_ts",    np.array([0.1]))
+    kwargs["destination"] = destination = kwargs.get("destination", "/diffusion/translation")
+    kwargs["selection"]                 = hdf5_file.attrs("0000/com")["resname"]                    # LAZY HACK; FIX
+
+    # If analysis has not been run previously, run analysis
+    if     (force
+    or not (destination in hdf5_file)):
+        log             = hdf5_file.load("*/log", type = "table")
+        ignore_index    = _ignore_index(log["time"], ignore)
+        kwargs["time"]  = log["time"][ignore_index:]
+        kwargs["com"]   = hdf5_file.load(source)[ignore_index:]
         return [(small_molecule, kwargs)]
 
+    # If analysis has been run previously but with different settings, run analysis
     data            = hdf5_file[destination]
     attrs           = hdf5_file.attrs(destination)
-    time            = hdf5_file.load("*/log", type = "table")["time"]
-    kwargs["time"]  = _ignore_time(time, time, ignore)
+    log             = hdf5_file.load("*/log", type = "table")
+    ignore_index    = _ignore_index(log["time"], ignore)
+    kwargs["time"]  = log["time"][ignore_index:]
     if (np.any(data["delta t"] != np.array(delta_ts, np.float32))
-    or (attrs["time"]          != "{0:.3f} {1:.3f}".format(kwargs["time"][0], kwargs["time"][-1]))):
-        com             = hdf5_file.load(source if source.startswith("*/") else "*/" + source)
-        kwargs["com"]   = _ignore_time(time, com, ignore)
+    or (attrs["time"]          != "{0:.3f} {1:.3f}".format(float(kwargs["time"][0]), float(kwargs["time"][-1])))):
+        kwargs["com"]   = hdf5_file.load(source)[ignore_index:]
         return [(small_molecule, kwargs)]
+
+    # If analysis has been run previously with the same settings, output data and return
     if kwargs.get("verbose", False):    _print_small_molecule(data, attrs)
     return False
 def _print_small_molecule(data, attrs):
