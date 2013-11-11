@@ -13,9 +13,9 @@ def topology(infile, **kwargs):
     """ Parses a pdb <infile> using MDTraj, and stores the resulting topology as a json string.
         Adapted from 'topology.py' in MDTraj """
     topology        = md.load(infile).topology
-    topology_str    = topology_to_json(topology)
+    topology        = topology_to_json(topology)
 
-    yield ("topology", {"json": topology_str})
+    yield ("topology", {"json": str(topology_str)})
 
 def _check_topology(hdf5_file, force = False, **kwargs):
     if    (force

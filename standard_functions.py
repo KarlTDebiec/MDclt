@@ -179,4 +179,30 @@ def topology_to_json(topology):
     for atom1, atom2 in bond_iter:
         topology_dict["bonds"].append([int(atom1.index),
                                        int(atom2.index)])
-    return str(json.dumps(topology_dict))
+    return json.dumps(topology_dict)
+
+def topology_from_json(topology_json):
+    import operator
+    import json
+    from mdtraj import Topology
+    import mdtraj.pdb.element as elem
+    print type(json)
+    topology_dict   = json.loads(topology_json)
+    topology        = Topology()
+
+    for chain_dict in sorted(topology_dict['chains'], key=operator.itemgetter('index')):
+        chain = topology.add_chain()
+        for residue_dict in sorted(chain_dict['residues'], key=operator.itemgetter('index')):
+            residue = topology.add_residue(residue_dict['name'], chain)
+            for atom_dict in sorted(residue_dict['atoms'], key=operator.itemgetter('index')):
+                try:
+                    element = elem.get_by_symbol(atom_dict['element'])
+                except KeyError:
+                    raise ValueError('The symbol %s isn\'t a valid element' % atom_dict['element'])
+                topology.add_atom(atom_dict['name'], element, residue)
+
+    atoms = list(topology.atoms)
+    for index1, index2 in topology_dict['bonds']:
+        topology.add_bond(atoms[index1], atoms[index2])
+
+    return topology
