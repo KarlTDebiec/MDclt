@@ -186,7 +186,7 @@ def topology_from_json(topology_json):
     import json
     from mdtraj import Topology
     import mdtraj.pdb.element as elem
-    print type(json)
+
     topology_dict   = json.loads(topology_json)
     topology        = Topology()
 
