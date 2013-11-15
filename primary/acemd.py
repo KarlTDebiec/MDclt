@@ -1,12 +1,12 @@
 #!/usr/bin/python
-desc = """acemd.py
+desc = """MD_toolkit.primary.acemd.py
     Functions for primary analysis of ACEMD trajectories
     Written by Karl Debiec on 12-11-30
-    Last updated 13-08-04"""
+    Last updated by Karl Debiec 13-11-15"""
 ########################################### MODULES, SETTINGS, AND DEFAULTS ############################################
 import commands, os, sys
 import numpy as np
-from   standard_functions import month
+from   MD_toolkit.standard_functions import month
 ################################################## ANALYSIS FUNCTIONS ##################################################
 def log(segment, time_offset = 0.0, **kwargs):
     """ Parses log for <segment> """

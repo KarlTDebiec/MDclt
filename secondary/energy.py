@@ -1,5 +1,5 @@
 #!/usr/bin/python
-desc = """energy.py
+desc = """MD_toolkit.secondary.energy.py
     Functions for secondary analysis of energy
     Written by Karl Debiec on 13-05-06
     Last updated 13-08-14"""

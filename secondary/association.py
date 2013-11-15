@@ -1,8 +1,8 @@
 #!/usr/bin/python
-desc = """association.py
+desc = """MD_toolkit.secondary.association.py
     Functions for secondary analysis of molecular association
     Written by Karl Debiec on 12-08-15
-    Last updated 13-10-21"""
+    Last updated by Karl Debiec on 13-11-15"""
 ########################################### MODULES, SETTINGS, AND DEFAULTS ############################################
 import os, sys, time, types, warnings
 import numpy as np

@@ -1,8 +1,8 @@
 #!/usr/bin/python
-desc = """pmf.py
+desc = """MD_toolkit.secondary.pmf.py
     Calculation of potential of mean force (PMF)
     Written by Karl Debiec on 12-08-15
-    Last updated 13-11-01"""
+    Last updated by Karl Debiec on 13-11-15"""
 ########################################### MODULES, SETTINGS, AND DEFAULTS ############################################
 import os, sys, types
 import numpy as np

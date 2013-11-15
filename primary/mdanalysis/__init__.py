@@ -1,92 +1,88 @@
 #!/usr/bin/python
-desc = """general.py
-    Functions for primary analysis of MD trajectories
+desc = """MD_toolkit.primary.mdanalysis.__init__.py
+    Functions for primary analysis of MD trajectories using MDAnalysis
     Written by Karl Debiec on 12-11-30
-    Last updated 13-07-21"""
+    Last updated by Karl Debiec on 13-11-15"""
 ########################################### MODULES, SETTINGS, AND DEFAULTS ############################################
 import os, sys
 import numpy as np
 import MDAnalysis as md
 import MDAnalysis.analysis.align as mdaa
 import scipy.spatial.distance as ssd
-import trajectory_cython
 from   cython_functions   import _cy_contact
-from   standard_functions import is_num, _contact_2D_to_1D_indexes
+from   MD_toolkit.standard_functions import is_num, _contact_2D_to_1D_indexes
 ################################################## ANALYSIS FUNCTIONS ##################################################
-def com(segment, domain = "", selection = "protein", **kwargs):
-    """ Calculates center of mass of <domain> with <selection> """
-    trj     = md.Universe(segment.topology, segment.trajectory)
-    com     = np.zeros((len(trj.trajectory), 3), np.float32)
-    trj_sel = trj.selectAtoms(selection)
+def com(segment, destination, selection, **kwargs):
+    """ Calculates center of mass of <selection> """
+    trj        = md.Universe(segment.topology, segment.trajectory)
+    com        = np.zeros((len(trj.trajectory), 3), np.float32)
+    trj_sel    = trj.selectAtoms(selection)
     for i, frame in enumerate(trj.trajectory):
-        com[i]  = trj_sel.centerOfMass()
-    return  [(segment + "/com_" + domain, com),
-             (segment + "/com_" + domain, {"selection": selection, "method": "mdanalysis", "units": "A"})]
+        com[i] = trj_sel.centerOfMass()
+    return  [(segment + "/" + destination, com),
+             (segment + "/" + destination, {"selection": selection, "method": "mdanalysis", "units": "A"})]
 def _check_com(hdf5_file, segment, force = False, **kwargs):
     if not (segment.topology   and os.path.isfile(segment.topology)
     and     segment.trajectory and os.path.isfile(segment.trajectory)):
             return False
-    domain  = kwargs.get("domain", "")
+    kwargs["destination"] = destination = kwargs.get("destination", "com")
+    kwargs["selection"]   = selection   = kwargs.get("selection",   "protein")
     if    (force
-    or not segment + "/com_" + domain in hdf5_file):
+    or not segment + "/" + destination in hdf5_file):
             return [(com, segment, kwargs)]
     else:   return False
 
-def rmsd(segment, reference, selection = "protein and name CA", destination = "", **kwargs):
+def rmsd(segment, destination, selection, reference, **kwargs):
     """ Calculates rmsd of <selection> relative to <reference> """
-    if not (destination == "" or destination.startswith("_")):
-        destination = "_" + destination
-    ref         = md.Universe(reference)
-    trj         = md.Universe(segment.topology, segment.trajectory)
-    rmsd        = np.zeros(len(trj.trajectory),      np.float32)
-    rotmat      = np.zeros((len(trj.trajectory), 9), np.float64)
-    ref_sel     = ref.selectAtoms(selection)
-    trj_sel     = trj.selectAtoms(selection)
-    n_atoms     = trj_sel.numberOfAtoms()
-    ref_frame   = (ref_sel.coordinates() - ref_sel.centerOfMass()).T.astype("float64")
+    ref           = md.Universe(reference)
+    trj           = md.Universe(segment.topology, segment.trajectory)
+    rmsd          = np.zeros(len(trj.trajectory),      np.float32)
+    rotmat        = np.zeros((len(trj.trajectory), 9), np.float64)
+    ref_sel       = ref.selectAtoms(selection)
+    trj_sel       = trj.selectAtoms(selection)
+    ref_frame     = (ref_sel.coordinates() - ref_sel.centerOfMass()).T.astype("float64")
     for i, frame in enumerate(trj.trajectory):
-        trj_frame   = (trj_sel.coordinates() - trj_sel.centerOfMass()).T.astype("float64")
-        rmsd[i]     = mdaa.qcp.CalcRMSDRotationalMatrix(ref_frame, trj_frame, n_atoms, rotmat[i], None)
-    return  [(segment + "/rmsd"   + destination,  rmsd),
-             (segment + "/rotmat" + destination,  np.array(rotmat, np.float32)),
-             (segment + "/rmsd"   + destination,  {"selection": selection, "method": "mdanalysis", "units": "A"}),
-             (segment + "/rotmat" + destination,  {"selection": selection, "method": "mdanalysis"})]
+        trj_frame = (trj_sel.coordinates() - trj_sel.centerOfMass()).T.astype("float64")
+        rmsd[i]   = mdaa.qcp.CalcRMSDRotationalMatrix(ref_frame, trj_frame, trj_sel.numberOfAtoms(), rotmat[i], None)
+    return  [(segment + "/" + destination[0], rmsd),
+             (segment + "/" + destination[1], np.array(rotmat, np.float32)),
+             (segment + "/" + destination[0], {"selection": selection, "method": "mdanalysis", "units": "A"}),
+             (segment + "/" + destination[1], {"selection": selection, "method": "mdanalysis"})]
 def _check_rmsd(hdf5_file, segment, force = False, **kwargs):
-    destination  = kwargs.get("destination", "")
-    if not (destination == "" or destination.startswith("_")):
-        destination = "_" + destination
     if not (segment.topology   and os.path.isfile(segment.topology)
     and     segment.trajectory and os.path.isfile(segment.trajectory)):
             return False
+    kwargs["destination"] = destination = kwargs.get("destination", ["rmsd", "rotmat"])
+    kwargs["selection"]   = selection   = kwargs.get("selection",   "protein and name CA")
     if     (force
-    or not [segment + "/rmsd"   + destination,
-            segment + "/rotmat" + destination] in hdf5_file):
+    or not [segment + "/" + destination[0],
+            segment + "/" + destination[1]] in hdf5_file):
             return [(rmsd, segment, kwargs)]
     else:   return False
 
-def contact(segment, res_sel = "(protein or resname ACE)", atom_sel = "(name C* or name N* or name O* or name S*)",
-            **kwargs):
-    """ Calculates inter-residue contacts, defined as heavy-atom minimum distance within 5.5 Angstrom """
-    trj             = md.Universe(segment.topology, segment.trajectory)
-    trj_sel         = trj.selectAtoms(res_sel + " and " + atom_sel)
-    n_res           = len(trj_sel.residues)
-    atomcounts      = np.array([len(R.selectAtoms(atom_selection)) for R in trj_sel.residues])
-    atomcounts      = np.array([(np.sum(atomcounts[:i]), np.sum(atomcounts[:i]) + n) for i, n in enumerate(atomcounts)])
-    contacts        = np.zeros((len(trj.trajectory), (n_res ** 2 - n_res) / 2), np.int8)
-    indexes         = _contact_2D_to_1D_indexes(n_res)
-    for frame_i, frame in enumerate(trj.trajectory):
-        contacts[frame_i]   = _cy_contact(trj_sel.coordinates().T.astype("float64"), atomcounts, indexes)
-    return  [(segment + "/contact",  contacts)]
-def _check_contact(hdf5_file, segment, force = False, **kwargs):
-    if not (segment.topology   and os.path.isfile(segment.topology)
-    and     segment.trajectory and os.path.isfile(segment.trajectory)):
-            return False
-    if    (force
-    or not segment + "/contact" in hdf5_file):
-            return [(contact, segment, kwargs)]
-    else:   return False
-
 ##################################################### DEPRECIATED ######################################################
+#def contact(segment, res_sel = "(protein or resname ACE)", atom_sel = "(name C* or name N* or name O* or name S*)",
+#            **kwargs):
+#    """ Calculates inter-residue contacts, defined as heavy-atom minimum distance within 5.5 Angstrom """
+#    trj             = md.Universe(segment.topology, segment.trajectory)
+#    trj_sel         = trj.selectAtoms(res_sel + " and " + atom_sel)
+#    n_res           = len(trj_sel.residues)
+#    atomcounts      = np.array([len(R.selectAtoms(atom_selection)) for R in trj_sel.residues])
+#    atomcounts      = np.array([(np.sum(atomcounts[:i]), np.sum(atomcounts[:i]) + n) for i, n in enumerate(atomcounts)])
+#    contacts        = np.zeros((len(trj.trajectory), (n_res ** 2 - n_res) / 2), np.int8)
+#    indexes         = _contact_2D_to_1D_indexes(n_res)
+#    for frame_i, frame in enumerate(trj.trajectory):
+#        contacts[frame_i]   = _cy_contact(trj_sel.coordinates().T.astype("float64"), atomcounts, indexes)
+#    return  [(segment + "/contact",  contacts)]
+#def _check_contact(hdf5_file, segment, force = False, **kwargs):
+#    if not (segment.topology   and os.path.isfile(segment.topology)
+#    and     segment.trajectory and os.path.isfile(segment.trajectory)):
+#            return False
+#    if    (force
+#    or not segment + "/contact" in hdf5_file):
+#            return [(contact, segment, kwargs)]
+#    else:   return False
+
 #def mindist(arguments):
 #    segment, topology, trajectory, name, group_1, group_2 = arguments
 #    trj         = md.Universe(topology, trajectory)

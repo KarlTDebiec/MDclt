@@ -1,12 +1,12 @@
 #!/usr/bin/python
-desc = """vmd.py
+desc = """MD_toolkit.primary.vmd.__init__.py
     Functions for primary analysis of MD trajectories using Visual Molecular Dynamics
     Written by Karl Debiec on 13-03-06
-    Last updated 13-07-24"""
+    Last updated by Karl Debiec on 13-11-15"""
 ########################################### MODULES, SETTINGS, AND DEFAULTS ############################################
 import os, sys
 import numpy as np
-from   standard_functions import _shell_executor
+from   MD_toolkit.standard_functions import _shell_executor
 ################################################## ANALYSIS FUNCTIONS ##################################################
 def rmsd(segment, reference, vmd = "vmd", domain = "", selection = "protein and name CA", **kwargs):
     """ Calculates rmsd of <domain> relative to <reference> with <selection> using <vmd> """

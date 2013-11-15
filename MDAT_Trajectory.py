@@ -1,15 +1,15 @@
 #!/usr/bin/python
-desc = """MDAT_Trajectory.py
+desc = """MD_toolkit.MDAT_Trajectory.py
     Subclass of MDTraj.trajectory.Trajectory with added ability to load from our HDF5 File format
     Written by Marissa pacey on 13-10-20
-    Last updated 13-11-15"""
+    Last updated by Karl Debiec on 13-11-15"""
 ########################################### MODULES, SETTINGS, AND DEFAULTS ############################################
 import os, sys
 import numpy as np
 from   mdtraj import Topology
 from   mdtraj.trajectory import load, Trajectory
-from   hdf5_functions import HDF5_File
-from   standard_functions import topology_from_json
+from   MD_toolkit.HDF5_File import HDF5_File
+from   MD_toolkit.standard_functions import topology_from_json
 ######################################################## CLASS #########################################################
 class MDAT_Trajectory(Trajectory):
     def __init__(self, filenames = [], source = "", **kwargs):

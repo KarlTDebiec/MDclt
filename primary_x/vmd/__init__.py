@@ -1,12 +1,12 @@
 #!/usr/bin/python
-desc = """vmd.py
+desc = """MD_toolkit.primary_x.vmd.py
     Functions for primary cross-segment analysis of MD trajectories using Visual Molecular Dynamics
     Written by Karl Debiec on 13-07-18
-    Last updated 13-07-22"""
+    Last updated by Karl Debiec on 13-11-15"""
 ########################################### MODULES, SETTINGS, AND DEFAULTS ############################################
 import commands, os, sys, types
 import numpy as np
-from   standard_functions import shell_iterator
+from   MD_toolkit.standard_functions import shell_iterator
 ################################################## ANALYSIS FUNCTIONS ##################################################
 def com(segments, vmd = "vmd", selection = ["protein and name CA"], destination = "", **kwargs):
     """ Calculates com of <selection>(s) accounting for periodic boundary conditions using <vmd> """

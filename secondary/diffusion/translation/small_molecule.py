@@ -1,8 +1,8 @@
 #!/usr/bin/python
-desc = """translation.py
-    Functions for analysis of translational diffusion
+desc = """small_molecule.py
+    Functions for analysis of translational diffusion of small molecules
     Written by Karl Debiec on 13-02-08
-    Last updated 13-11-01"""
+    Last updated by Karl Debiec on 13-11-15"""
 ########################################### MODULES, SETTINGS, AND DEFAULTS ############################################
 import os, sys
 import numpy as np

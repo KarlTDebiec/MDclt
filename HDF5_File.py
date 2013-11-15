@@ -1,14 +1,13 @@
 #!/usr/bin/python
-desc = """hdf5_functions.py
+desc = """MD_toolkit.HDF5_File.py
     Class for simplifying interaction with HDF5 files
     Written by Karl Debiec on 13-02-03
-    Last updated 13-10-10"""
+    Last updated by Karl Debiec 13-11-15"""
 ########################################### MODULES, SETTINGS, AND DEFAULTS ############################################
 import commands, os, sys, types
 import h5py
 import numpy as np
-from   collections import OrderedDict
-from   standard_functions import is_num, Function_to_Method_Wrapper
+from   MD_toolkit.standard_functions import is_num, Function_to_Method_Wrapper
 ######################################################## CLASS #########################################################
 class HDF5_File:
     def __init__(self, filename):

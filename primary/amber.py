@@ -1,8 +1,8 @@
 #!/usr/bin/python
-desc = """amber.py
+desc = """MD_toolkit.primary.amber.py
     Functions for primary analysis of AMBER trajectories
     Written by Karl Debiec on 12-12-01
-    Last updated 13-10-07"""
+    Last updated by Karl Debiec on 13-11-15"""
 ########################################### MODULES, SETTINGS, AND DEFAULTS ############################################
 import commands, os, sys
 import numpy as np

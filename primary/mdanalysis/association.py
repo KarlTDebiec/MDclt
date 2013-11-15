@@ -1,13 +1,13 @@
 #!/usr/bin/python
-desc = """association.py
-    Functions for primary analysis of molecular association
+desc = """MD_toolkit.primary.mdanalysis.association.py
+    Functions for primary analysis of molecular association using MDAnalysis
     Written by Karl Debiec on 12-11-30
-    Last updated 13-06-04"""
+    Last updated by Karl Debiec on 13-11-15"""
 ########################################### MODULES, SETTINGS, AND DEFAULTS ############################################
 import os, sys
 import numpy as np
 import MDAnalysis as md
-from   cython_functions import _cy_distance_pbc
+from   MD_toolkit.cython_functions import _cy_distance_pbc
 ################################################## ANALYSIS FUNCTIONS ##################################################
 def comdist(segment, selection_1, selection_2, mode = "residue", **kwargs):
     """ Calculates center of mass distance between two selections or residue types; assumes cubic box and pbc """

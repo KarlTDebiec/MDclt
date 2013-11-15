@@ -1,10 +1,11 @@
 #!/usr/bin/python
-desc = """standard_functions.py
+desc = """MD_toolkit.standard_functions.py
     Standard functions
     Written by Karl Debiec on 13-02-03
-    Last updated 13-11-15"""
+    Last updated by Karl Debiec on 13-11-15"""
 ########################################### MODULES, SETTINGS, AND DEFAULTS ############################################
 import os, subprocess, sys
+from   importlib import import_module
 import numpy as np
 ####################################################### CLASSES ########################################################
 class Segment:
@@ -64,9 +65,9 @@ def month(string):
              "jul":  7, "aug":  8, "sep":  9, "oct": 10, "nov": 11, "dec": 12}
     try:    return month[string.lower()]
     except: return None
-def _string_to_function(module_function):
-    module, function = module_function.split(".")
-    return getattr(sys.modules[module], function)
+def string_to_function(module_function):
+    module, function = ".".join(module_function.split(".")[:-1]), module_function.split(".")[-1]
+    return getattr(import_module(module), function)
 def _shell_executor(command):
     pipe    = subprocess.Popen(command, shell = True, stdout = subprocess.PIPE, stderr = subprocess.PIPE)
     for line in iter(pipe.stdout.readline, ""):

@@ -1,12 +1,12 @@
 #!/usr/bin/python
-desc = """desmond.py
+desc = """MD_toolkit.primary.desmond.py
     Functions for primary analysis of DESMOND trajectories
     Written by Karl Debiec on 12-11-30
-    Last updated 13-07-21"""
+    Last updated by Karl Debiec on 13-11-15"""
 ########################################### MODULES, SETTINGS, AND DEFAULTS ############################################
 import commands, os, sys
 import numpy as np
-from   standard_functions import month
+from   MD_toolkit.standard_functions import month
 ################################################## ANALYSIS FUNCTIONS ##################################################
 def log(segment, **kwargs):
     """ Parses log for <segment> """
