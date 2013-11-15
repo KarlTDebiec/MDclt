@@ -46,8 +46,8 @@ def pmf(hdf5_file,
     data    = np.array([tuple(frame) for frame in zip(bins[:-1], bins[1:], count, probability, free_energy, pmf)],
                        np.dtype([("lower bound", "f4"), ("upper bound", "f4"), ("count", "i4"),
                                  ("probability", "f4"), ("free energy", "f4"), ("pmf",   "f4")]))
-    attrs   = {"lower bound units": "A", "upper bound units": "A", "free energy units": "kBT", "pmf units": "kcal mol-1",
-               "temperature": temperature, "zero_point": zero_point,
+    attrs   = {"lower bound units": "A", "upper bound units": "A", "free energy units": "kBT",
+               "pmf units": "kcal mol-1", "temperature": temperature, "zero_point": zero_point,
                "time": "{0:.3f} {1:.3f}".format(float(time[0]), float(time[-1]))}
     if verbose: _print_pmf(pcoord, data, attrs)
     return  [(destination, data),
