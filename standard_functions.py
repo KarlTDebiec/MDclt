@@ -2,7 +2,7 @@
 desc = """standard_functions.py
     Standard functions
     Written by Karl Debiec on 13-02-03
-    Last updated 13-07-18"""
+    Last updated 13-11-15"""
 ########################################### MODULES, SETTINGS, AND DEFAULTS ############################################
 import os, subprocess, sys
 import numpy as np
