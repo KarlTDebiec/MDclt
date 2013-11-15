@@ -7,7 +7,7 @@ desc = """pmf.py
 import os, sys, types
 import numpy as np
 ################################################## ANALYSIS FUNCTIONS ##################################################
-def pmf(hdf5_file,
+def pmf_1D(hdf5_file,
         time,                                               # Simulation time
         count,                                              # Counts in each bin
         bins,                                               # Bins
@@ -49,11 +49,11 @@ def pmf(hdf5_file,
     attrs   = {"lower bound units": "A", "upper bound units": "A", "free energy units": "kBT", "pmf units": "kcal mol-1",
                "temperature": temperature, "zero_point": zero_point,
                "time": "{0:.3f} {1:.3f}".format(float(time[0]), float(time[-1]))}
-    if verbose: _print_pmf(pcoord, data, attrs)
+    if verbose: _print_pmf_1D(pcoord, data, attrs)
     return  [(destination, data),
              (destination, attrs)]
 
-def _check_pmf(hdf5_file, force = False, **kwargs):
+def _check_pmf_1D(hdf5_file, force = False, **kwargs):
     """ Determines whether or not to run 'association.pmf' based on settings and data present in hdf5 file, and loads
         necessary primary data. 'source' and destination' may be set manually, but may also be guessed from pcoord. """
     def _ignore_index(time, ignore):
@@ -90,7 +90,7 @@ def _check_pmf(hdf5_file, force = False, **kwargs):
         ignore_index    = _ignore_index(log["time"], ignore)
         kwargs["time"]  = log["time"][ignore_index:]
         kwargs["count"] = hdf5_file.load(source, loader = _load_association, bins = bins, ignore_index = ignore_index)
-        return [(pmf, kwargs)]
+        return [(pmf_1D, kwargs)]
 
     # If analysis has been run previously but with different settings, run analysis
     data            = hdf5_file[destination]
@@ -105,13 +105,13 @@ def _check_pmf(hdf5_file, force = False, **kwargs):
     or (np.any(data["upper bound"]   != np.array(bins[1:],  np.float32)))
     or (attrs["time"]                != "{0:.3f} {1:.3f}".format(float(kwargs["time"][0]), float(kwargs["time"][-1])))):
         kwargs["count"] = hdf5_file.load(source, loader = _load_association, bins = bins, ignore_index = ignore_index)
-        return [(pmf, kwargs)]
+        return [(pmf_1D, kwargs)]
 
     # If analysis has been run previously with the same settings, output data and return
-    if kwargs.get("verbose", False): _print_pmf(pcoord, data, attrs)
+    if kwargs.get("verbose", False): _print_pmf_1D(pcoord, data, attrs)
     return False
 
-def _print_pmf(pcoord, data, attrs):
+def _print_pmf_1D(pcoord, data, attrs):
     print "DURATION {0:5d} ns PROGRESS COORDINATE {1} ".format(int(attrs["time"]),   pcoord.upper())
     print "TEMPERAUTRE {0:6.3f} K ZERO POINT {1}".format(float(attrs["temperature"]), attrs["zero_point"])
     print "  LOWER  UPPER  COUNT        P      FE     PMF"
