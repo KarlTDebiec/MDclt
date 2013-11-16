@@ -2,7 +2,7 @@
 desc = """MD_toolkit.primary_x.__init__.py
     Functions for primary cross-segment analysis of MD trajectories
     Written by Karl Debiec on 13-10-30
-    Last updated by Karl Debiec on 13-11-02"""
+    Last updated by Karl Debiec on 13-11-15"""
 ########################################### MODULES, SETTINGS, AND DEFAULTS ############################################
 import os, sys, types
 import numpy as np

@@ -7,7 +7,7 @@ desc = """MD_toolkit.primary.mdanalysis.association.py
 import os, sys
 import numpy as np
 import MDAnalysis as md
-from   MD_toolkit.cython_functions import _cy_distance_pbc
+from   cython_functions import _cy_distance_pbc
 ################################################## ANALYSIS FUNCTIONS ##################################################
 def comdist(segment, selection_1, selection_2, mode = "residue", **kwargs):
     """ Calculates center of mass distance between two selections or residue types; assumes cubic box and pbc """

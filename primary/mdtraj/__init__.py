@@ -14,19 +14,14 @@ from MD_toolkit.standard_functions import topology_to_json
 def coordinates(segment, **kwargs):
     """ Loads coordinates in format compatible with mdtraj """
     trajectory          = mdtraj.load(segment.trajectory, top = segment.topology)
-
     cell_lengths        = trajectory.unitcell_lengths
-    cell_lengths_attr   = {"CLASS" : "EARRAY", "VERSION": 1.0, "TITLE": "", "EXTDIM": 0, "units" : "degrees"}
-
+    cell_lengths_attr   = {"CLASS" : "EARRAY", "VERSION": 1.0, "TITLE": "", "EXTDIM": 0, "units": "degrees"}
     cell_angles         = trajectory.unitcell_angles
     cell_angles_attr    = {"CLASS" : "EARRAY", "VERSION": 1.0, "TITLE": "", "EXTDIM": 0, "units": "nanometers"}
-
     coordinates         = trajectory.xyz
     coordinates_attr    = {"CLASS" : "EARRAY", "VERSION": 1.0, "TITLE": "", "EXTDIM": 0, "units": "nanometers"}
-
     time                = trajectory.time
     time_attr           = {"CLASS" : "EARRAY", "VERSION": 1.0, "TITLE": "", "EXTDIM": 0, "units": "picoseconds"}
-
     topology_json       = str(topology_to_json(trajectory.topology))
     topology            = np.array(topology_json, dtype="S{}".format(len(topology_json)))
     topology_attr       = {"CLASS" : "ARRAY", "VERSION": 2.3, "TITLE": "", "FLAVOR": "python"}
@@ -73,7 +68,6 @@ def com_resname(segment, destination, resname, **kwargs):
     mean        = np.zeros((trj.n_frames, len(indexes), 3), np.float32)
     std         = np.zeros((trj.n_frames, len(indexes), 3), np.float32)
     for i, frame in enumerate(trj.xyz):
-        print segment, i
         for j, index in enumerate(indexes):
             com[i][j]   = np.sum(trj.xyz[i][index] * masses[j], axis = 0) / total_mass[j]
     return  [(segment + "/" + destination, com * 10.0),

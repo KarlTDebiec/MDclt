@@ -7,7 +7,7 @@ desc = """MD_toolkit.secondary.association.py
 import os, sys, time, types, warnings
 import numpy as np
 from   scipy.optimize import fmin
-from   standard_functions import block_average, fit_curve
+from   MD_toolkit.standard_functions import block_average, fit_curve
 ################################################## INTERNAL FUNCTIONS ##################################################
 def _concentration(n, volume): return float(n) / 6.0221415e23 / volume
 def _P_bound_to_Ka(P_bound, C_mol1_total, C_mol2_total):
