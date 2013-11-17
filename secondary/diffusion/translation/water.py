@@ -78,7 +78,7 @@ def _check_water(hdf5_file, force = False, **kwargs):
     kwargs["source"]      = source      = source if source.startswith("*/") else "*/" + source
     ignore                              = kwargs.pop("ignore",      0)
     kwargs["delta_ts"]    = delta_ts    = kwargs.get("delta_ts",    np.array([0.1]))
-    kwargs["destination"] = destination = kwargs.get("destination", "/diffusion/translation")
+    kwargs["destination"] = destination = kwargs.get("destination", "/diffusion/translation_water")
 
     # If analysis has not been run previously, run analysis
     if     (force
