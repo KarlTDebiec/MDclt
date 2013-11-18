@@ -2,7 +2,7 @@
 desc = """MD_toolkit.primary.mdtraj.__init__.py
     Functions for primary analysis of MD trajectories
     Written by Karl Debiec on 13-10-30
-    Last updated by Karl Debiec on 13-11-15"""
+    Last updated by Karl Debiec on 13-11-17"""
 ########################################### MODULES, SETTINGS, AND DEFAULTS ############################################
 import os, sys, types, warnings
 import numpy as np
@@ -83,6 +83,90 @@ def _check_com_resname(hdf5_file, segment, force = False, **kwargs):
     if    (force
     or not segment + "/" + destination in hdf5_file):
             return [(com_resname, segment, kwargs)]
+    else:   return False
+
+def dipole(segment, destination, cms_file, solvent, **kwargs):
+    """ Calculates dipole moment of system. Loads partial charges from <cms_file> of <cms_file_format>. Calculates
+        and includes pseudoatoms if <solvent> is a four-point water model """
+
+    # Load trajectory using mdtraj
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        trj = mdtraj.load(segment.trajectory, top = segment.topology)
+
+    # Load data from Desmond cms format
+    awk_command = """
+        /sites/{
+            in_sites=1; in_atoms=0; next }
+        /\}/{
+            in_sites=0; in_atoms=0; next }
+        /:::/{
+            if (in_sites == 1) {
+                if (in_atoms == 0) {in_atoms = 1}
+                else               {in_atoms = 0}}}
+        in_atoms"""
+    command     = "cat {0} | awk '{1}' | grep -v :::".format(cms_file, awk_command)
+    raw_data    =  commands.getoutput(command).split("\n")
+    dtype       = np.dtype([("atom number", "i4"), ("residue number", "i4"), ("residue name", "S10"),
+                            ("charge",      "f4"), ("mass",           "f4"), ("vdw type",     "S10")])
+    cms_sites   = np.array([(a,f,g,c,d,e) for a,b,c,d,e,f,g in [d.split() for d in raw_data]], dtype)
+
+    # Separate solvent charge data from solute charge data
+    solvent_charge = {}
+    solvent_mass   = {}
+    for atom in cms_sites[-3:]:
+        if   (int(round(atom["mass"])) == 16):
+            solvent_charge["O"] = atom["charge"]
+            solvent_mass["O"]   = atom["mass"]
+        elif (int(round(atom["mass"])) ==  1):
+            solvent_charge["H"] = atom["charge"]
+            solvent_mass["H"]   = atom["mass"]
+    cms_sites       = cms_sites[:-4]
+
+    # Copy charge information from cms file into mdtraj topology
+    for i, atom in enumerate(trj.topology.atoms):
+        if   i < cms_sites.size:
+            if   (int(round(atom.element.mass)) != int(round(cms_sites[i]["mass"]))):
+                raise Exception("MASSES OF ATOM {0} ({1}, {2}) DO NOT MATCH".format(
+                        i, atom.element.mass, cms_sites[i]["mass"]))
+            elif (atom.residue.name             != cms_sites[i]["residue name"]):
+                raise Exception("RESIDUE NAMES of ATOM {0} ({1}, {2}) DO NOT MATCH".format(
+                        i, atom.residue.name, cms_sites[i]["residue name"]))
+            else:
+            atom.charge = cms_sites[i]["charge"]
+            atom.mass   = cms_sites[i]["mass"]
+    elif (int(round(atom.element.mass)) == 35):
+        atom.charge = -1.0
+        atom.mass   = atom.element.mass
+    elif (atom.residue.name in ["HOH", "WAT", "T3P"]):
+        atom.charge = solvent_charge[atom.name[0]]
+        atom.mass   = solvent_mass[atom.name[0]]
+    else:
+        raise Exception("UNRECOGNIZED ATOM {0} in RESIDUE {1}".format(atom.name, atom.residue.name))
+    print atom.residue.name, atom.name, atom.charge
+
+    # Calculate dipole moment
+    dipole          = np.zeros((trj.n_frames, 3))
+    total_charge    = np.sum([atom.charge for atom in trj.topology.atoms])
+    total_mass      = np.sum([atom.mass   for atom in trj.topology.atoms])
+    net_dipole      = np.zeros(trj.n_frames)
+#    print total_charge, total_mass
+    for i, frame in enumerate(trj.xyz):
+        for residue in trj.topology.residues:
+            for atom in residue.atoms:
+                dipole[i] += atom.charge * frame[atom.index] * 10
+        net_dipole[i]  = np.sqrt(np.sum(dipole[i] ** 2))
+#        print i, net_dipole[i]
+    return []
+def _check_dipole(hdf5_file, segment, force = False, **kwargs):
+    if not (segment.topology   and os.path.isfile(segment.topology)
+    and     segment.trajectory and os.path.isfile(segment.trajectory)):
+            return False
+    kwargs["destination"] = destination = kwargs.get("destination", "dipole")
+    kwargs["solvent"]                   = kwargs.get("solvent",     "TIP3P")
+    if    (force
+    or not segment + "/" + destination in hdf5_file):
+            return [(dipole, segment, kwargs)]
     else:   return False
 
 
