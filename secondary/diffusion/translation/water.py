@@ -54,7 +54,7 @@ def water(hdf5_file,
             D              += list(np.mean(delta_xyz_sq, axis = 0) / (6 * delta_t) / 1000.0)
             mean            = np.mean(D)
             se              = np.std(D) / np.sqrt(float(len(D)))
-#            print len(D), mean, se
+            print len(D), mean, se
             res_index      += res_index_interval
         data[-1]           += [np.mean(D), np.std(D) / np.sqrt(float(len(D)))]
 
