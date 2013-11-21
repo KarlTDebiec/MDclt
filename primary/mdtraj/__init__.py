@@ -58,18 +58,18 @@ def com_resname(segment, destination, resname, **kwargs):
     for name in resname:
         for i, res in enumerate(trj.topology.residues, 1):
             if res.name == name:
-                indexes        += [np.array([a.index        for a in res.atoms], np.int)]
-                masses         += [np.array([a.element.mass for a in res.atoms], np.float32)]
-                total_mass     += [np.sum(masses[-1])]
-                masses[-1]      = np.column_stack((masses[-1], masses[-1], masses[-1]))
-                resname_str    += "{0} {1} ".format(res.name, i)
-    total_mass  = np.array(total_mass)
-    com         = np.zeros((trj.n_frames, len(indexes), 3), np.float32)
-    mean        = np.zeros((trj.n_frames, len(indexes), 3), np.float32)
-    std         = np.zeros((trj.n_frames, len(indexes), 3), np.float32)
+                indexes     += [np.array([a.index        for a in res.atoms], np.int)]
+                masses      += [np.array([a.element.mass for a in res.atoms], np.float32)]
+                total_mass  += [np.sum(masses[-1])]
+                masses[-1]   = np.column_stack((masses[-1], masses[-1], masses[-1]))
+                resname_str += "{0} {1} ".format(res.name, i)
+    total_mass = np.array(total_mass)
+    com        = np.zeros((trj.n_frames, len(indexes), 3), np.float32)
+    mean       = np.zeros((trj.n_frames, len(indexes), 3), np.float32)
+    std        = np.zeros((trj.n_frames, len(indexes), 3), np.float32)
     for i, frame in enumerate(trj.xyz):
         for j, index in enumerate(indexes):
-            com[i][j]   = np.sum(trj.xyz[i][index] * masses[j], axis = 0) / total_mass[j]
+            com[i][j] = np.sum(trj.xyz[i][index] * masses[j], axis = 0) / total_mass[j]
     return  [(segment + "/" + destination, com * 10.0),
              (segment + "/" + destination, {"resname": resname_str[:-1], "method": "mdtraj", "units": "A"})]
 def _check_com_resname(hdf5_file, segment, force = False, **kwargs):
