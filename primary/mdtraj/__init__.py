@@ -110,7 +110,7 @@ def dipole(segment, destination, cms_file, solvent, **kwargs):
     dtype     = np.dtype([("atom number", "i4"), ("residue number", "i4"), ("residue name", "S10"),
                           ("charge",      "f4"), ("mass",           "f4"), ("vdw type",     "S10")])
     cms_sites = np.array([(a,f,g,c,d,e) for a,b,c,d,e,f,g in [d.split() for d in raw_data]], dtype)
-#    for s in cms_sites: print s
+    for s in cms_sites: print s
 
     # Separate solvent charge data from solute charge data
     solvent_charge = {}
@@ -122,7 +122,10 @@ def dipole(segment, destination, cms_file, solvent, **kwargs):
         elif (int(round(atom["mass"])) ==  1):
             solvent_charge["H"] = atom["charge"]
             solvent_mass["H"]   = atom["mass"]
-    cms_sites       = cms_sites[:-3]
+    cms_sites       = cms_sites[np.where((cms_sites["residue name"] != "SPCE") &
+                                         (cms_sites["residue name"] != "Na+")  &
+                                         (cms_sites["residue name"] != "Cl-"))[0]]
+    for s in cms_sites: print s
 
     # Copy charge information from cms file into mdtraj topology
     for i, atom in enumerate(trj.topology.atoms):
@@ -131,15 +134,28 @@ def dipole(segment, destination, cms_file, solvent, **kwargs):
                 raise Exception("MASSES OF ATOM {0} ({1}, {2}) DO NOT MATCH".format(
                         i, atom.element.mass, cms_sites[i]["mass"]))
             elif (atom.residue.name             != cms_sites[i]["residue name"]):
-                raise Exception("RESIDUE NAMES of ATOM {0} ({1}, {2}) DO NOT MATCH".format(
+                if   cms_sites[i]["residue name"].lower().startswith(atom.residue.name.lower()):
+                    print("RESIDUE NAMES of ATOM {0} ({1}, {2}) DO NOT MATCH, CONTINUING".format(
                         i, atom.residue.name, cms_sites[i]["residue name"]))
-            else:
-                atom.charge = cms_sites[i]["charge"]
-                atom.mass   = cms_sites[i]["mass"]
+                elif cms_sites[i]["residue name"].lower().endswith(atom.residue.name.lower()):
+                    print("RESIDUE NAMES of ATOM {0} ({1}, {2}) DO NOT MATCH, CONTINUING".format(
+                        i, atom.residue.name, cms_sites[i]["residue name"]))
+                elif (cms_sites[i]["residue name"].lower().startswith("hi") and
+                      atom.residue.name.lower().startswith("hi")):
+                    print("RESIDUE NAMES of ATOM {0} ({1}, {2}) DO NOT MATCH, CONTINUING".format(
+                        i, atom.residue.name, cms_sites[i]["residue name"]))
+                else:
+                    raise Exception("RESIDUE NAMES of ATOM {0} ({1}, {2}) DO NOT MATCH".format(
+                        i, atom.residue.name, cms_sites[i]["residue name"]))
+            atom.charge = cms_sites[i]["charge"]
+            atom.mass   = cms_sites[i]["mass"]
         elif (int(round(atom.element.mass)) == 35):
             atom.charge = -1.0
             atom.mass   = atom.element.mass
-        elif (atom.residue.name in ["HOH", "WAT", "T3P"]):
+        elif (int(round(atom.element.mass)) == 23):
+            atom.charge = 1.0
+            atom.mass   = atom.element.mass
+        elif (atom.residue.name in ["HOH", "WAT", "T3P", "SPC"]):
             atom.charge = solvent_charge[atom.name[0]]
             atom.mass   = solvent_mass[atom.name[0]]
         else:
@@ -154,7 +170,7 @@ def dipole(segment, destination, cms_file, solvent, **kwargs):
             for atom in residue.atoms:
                 dipole[i] += atom.charge * frame[atom.index] * 10
         net_dipole[i]  = np.sqrt(np.sum(dipole[i] ** 2))
-#        print i, net_dipole[i]
+        print i, net_dipole[i]
     attrs = {"cms_file": cms_file, "solvent": solvent, "method": "mdtraj", "units": "e A"}
     return  [(segment + "/" + destination, net_dipole),
              (segment + "/" + destination, attrs)]
