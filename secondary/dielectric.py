@@ -2,7 +2,7 @@
 desc = """MD_toolkit.secondary.dielectric.py
     Functions for calculation of the static dielectric constant
     Written by Karl Debiec on 13-11-20
-    Last updated by Karl Debiec on 13-11-20"""
+    Last updated by Karl Debiec on 13-11-21"""
 ########################################### MODULES, SETTINGS, AND DEFAULTS ############################################
 import os, sys
 import numpy as np
@@ -17,10 +17,17 @@ def dielectric(hdf5_file,
 
     # Calculate static dielectric constant
     dipole *= 1.6021761206380539e-29
-    dipole_variance     = np.var(dipole * 1.6021761206380539e-29)               #   C^2     m^2
+
+    dipole              = np.sqrt(np.sum(dipole ** 2, axis = 1))
+    dipole_variance     = np.var(dipole)                                        #   C^2     m^2
+
+#    dipole_variance     = np.mean(np.sum(dipole * dipole, axis = 1)) - np.dot(np.mean(dipole, axis = 0), np.mean(dipole, axis = 0))
+
+#    dipole_variance     = np.mean(np.sum(dipole ** 2, axis = 1)) - np.sum(np.mean(dipole, axis = 0) ** 2)
+
     boltzmann           = 1.3806488e-23                                         #       J       K-1
     vacuum_permittivity = 8.854187817620e-12                                    #   C^2 J-1 m-1
-    epsilon             = dipole_variance / (3.0 * vacuum_permittivity * volume * boltzmann * temperature)
+    epsilon             = 1 + dipole_variance / (3.0 * vacuum_permittivity * volume * boltzmann * temperature)
     print dipole
     print np.mean(dipole * 1.6021761206380539e-29)
     print dipole_variance

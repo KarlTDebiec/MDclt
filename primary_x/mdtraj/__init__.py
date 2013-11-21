@@ -2,7 +2,7 @@
 desc = """MD_toolkit.primary_x.mdtraj.__init__.py
     Functions for primary analysis using MDTraj
     Written by Marissa Pacey on 13-09-16
-    Last updated by Karl Debiec on 13-11-15"""
+    Last updated by Karl Debiec on 13-11-21"""
 ########################################### MODULES, SETTINGS, AND DEFAULTS ############################################
 import commands, json, os, sys, warnings
 import numpy as np
@@ -49,6 +49,7 @@ def dipole(segment, destination, cms_file, solvent, side_length, **kwargs):
             solvent_charge["H"] = atom["charge"]
             solvent_mass["H"]   = atom["mass"]
     cms_sites       = cms_sites[np.where((cms_sites["residue name"] != "SPCE") &
+                                         (cms_sites["residue name"] != "T3P")  &
                                          (cms_sites["residue name"] != "Na+")  &
                                          (cms_sites["residue name"] != "Cl-"))[0]]
     for s in cms_sites: print s
@@ -92,22 +93,23 @@ def dipole(segment, destination, cms_file, solvent, side_length, **kwargs):
             raise Exception("UNRECOGNIZED ATOM {0} in RESIDUE {1}".format(atom.name, atom.residue.name))
 
     # Calculate dipole moment
-    inner_cutoff    = side_length / 4
-    dipole    = np.zeros((trj.n_frames, 3))
-    last_sign = None
-    offset    = np.zeros_like(trj.xyz[0])
+    inner_cutoff = side_length / 4
+    dipole       = np.zeros((trj.n_frames, 3))
+    com          = np.zeros((trj.n_atoms,  3))
+    last_sign    = None
+    offset       = np.zeros_like(trj.xyz[0])
+    trj.xyz     *= 10
     for i, frame in enumerate(trj.xyz):
-        frame     *= 10
         sign       = np.sign(frame)
         delta_sign = sign - last_sign if last_sign is not None else np.zeros_like(sign)
         last_sign  = sign
-        offset[(delta_sign == -2) & (np.abs(frame) < inner_cutoff)] += side_length
-        offset[(delta_sign ==  2) & (np.abs(frame) < inner_cutoff)] -= side_length
-        frame += offset
+        offset[(delta_sign == -2) & (np.abs(frame) > inner_cutoff)] += side_length
+        offset[(delta_sign ==  2) & (np.abs(frame) > inner_cutoff)] -= side_length
+        frame     += offset
         for residue in trj.topology.residues:
             for atom in residue.atoms:
                 dipole[i] += atom.charge * frame[atom.index]
-        print i, dipole[i], np.sqrt(np.sum(dipole[i] ** 2))
+        print i, dipole[i], np.sum(dipole[i] ** 2)
     attrs = {"cms_file": cms_file, "solvent": solvent, "method": "mdtraj", "units": "e A"}
     return  [(segment + "/" + destination, dipole),
              (segment + "/" + destination, attrs)]
