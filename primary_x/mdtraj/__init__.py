@@ -11,14 +11,14 @@ with warnings.catch_warnings():
     import mdtraj
 from   MD_toolkit.standard_functions import topology_to_json
 ################################################## ANALYSIS FUNCTIONS ##################################################
-def dipole(segment, destination, cms_file, solvent, side_length, **kwargs):
+def dipole(segments, destination, cms_file, side_length, **kwargs):
     """ Calculates dipole moment of system. Loads partial charges from <cms_file> of <cms_file_format>. Calculates
         and includes pseudoatoms if <solvent> is a four-point water model """
 
     # Load trajectory using mdtraj
 #    with warnings.catch_warnings():
 #        warnings.simplefilter("ignore")
-    trj = mdtraj.load(segment.trajectory, top = segment.topology)
+    trj = mdtraj.load(segments[0].trajectory, top = segments[0].topology)
     
     # Load data from Desmond cms format
     awk_command ="""
@@ -37,6 +37,7 @@ def dipole(segment, destination, cms_file, solvent, side_length, **kwargs):
                           ("charge",      "f4"), ("mass",           "f4"), ("vdw type",     "S10")])
     cms_sites = np.array([(a,f,g,c,d,e) for a,b,c,d,e,f,g in [d.split() for d in raw_data]], dtype)
     for s in cms_sites: print s
+    print
     
     # Separate solvent charge data from solute charge data
     solvent_charge = {} 
@@ -49,6 +50,7 @@ def dipole(segment, destination, cms_file, solvent, side_length, **kwargs):
             solvent_charge["H"] = atom["charge"]
             solvent_mass["H"]   = atom["mass"]
     cms_sites       = cms_sites[np.where((cms_sites["residue name"] != "SPCE") &
+                                         (cms_sites["residue name"] != "TIP3")  &
                                          (cms_sites["residue name"] != "T3P")  &
                                          (cms_sites["residue name"] != "Na+")  &
                                          (cms_sites["residue name"] != "Cl-"))[0]]
@@ -94,36 +96,41 @@ def dipole(segment, destination, cms_file, solvent, side_length, **kwargs):
 
     # Calculate dipole moment
     inner_cutoff = side_length / 4
-    dipole       = np.zeros((trj.n_frames, 3))
-    com          = np.zeros((trj.n_atoms,  3))
     last_sign    = None
     offset       = np.zeros_like(trj.xyz[0])
+    segment      = segments.pop(0)
     trj.xyz     *= 10
-    for i, frame in enumerate(trj.xyz):
-        sign       = np.sign(frame)
-        delta_sign = sign - last_sign if last_sign is not None else np.zeros_like(sign)
-        last_sign  = sign
-        offset[(delta_sign == -2) & (np.abs(frame) > inner_cutoff)] += side_length
-        offset[(delta_sign ==  2) & (np.abs(frame) > inner_cutoff)] -= side_length
-        frame     += offset
-        for residue in trj.topology.residues:
-            for atom in residue.atoms:
-                dipole[i] += atom.charge * frame[atom.index]
-        print i, dipole[i], np.sum(dipole[i] ** 2)
-    attrs = {"cms_file": cms_file, "solvent": solvent, "method": "mdtraj", "units": "e A"}
-    return  [(segment + "/" + destination, dipole),
-             (segment + "/" + destination, attrs)]
+    while True:
+        dipole       = np.zeros((trj.n_frames, 3))
+        for i, frame in enumerate(trj.xyz):
+#            sign       = np.sign(frame)
+#            delta_sign = sign - last_sign if last_sign is not None else np.zeros_like(sign)
+#            last_sign  = sign
+#            offset[(delta_sign == -2) & (np.abs(frame) > inner_cutoff)] += side_length
+#            offset[(delta_sign ==  2) & (np.abs(frame) > inner_cutoff)] -= side_length
+#            frame     += offset
+            for residue in trj.topology.residues:
+                if residue.name != "T3P": continue
+                for atom in residue.atoms:
+                    dipole[i] += atom.charge * frame[atom.index]
+            if i % 100 == 0:
+                print i, dipole[i], np.mean(np.sqrt(np.sum(dipole[:i] ** 2, axis = 1)))
+        attrs = {"cms_file": cms_file, "method": "mdtraj", "units": "e A"}
+        yield (segment + "/" + destination, dipole)
+        yield (segment + "/" + destination, attrs)
+        if len(segments) != 0:
+            segment = segments.pop(0)
+            trj = mdtraj.load(segment.trajectory, top = trj.topology)
+            trj.xyz *= 10
+        else:                  break
 def _check_dipole(hdf5_file, force = False, **kwargs):
-    segments        = kwargs.get("segments",    [])
-    kwargs["segment"] = segment = segments[0]
-    if not (segment.topology   and os.path.isfile(segment.topology)
-    and     segment.trajectory and os.path.isfile(segment.trajectory)):
-            return False
+    kwargs["segments"]    = segments    = [s for s in kwargs.get("segments", [])
+                                             if  s.topology   and os.path.isfile(s.topology)
+                                             and s.trajectory and os.path.isfile(s.trajectory)]
     kwargs["destination"] = destination = kwargs.get("destination", "dipole")
-    kwargs["solvent"]                   = kwargs.get("solvent",     "TIP3P")
-    kwargs["side_length"] = kwargs.get("side_length", hdf5_file["{0}/log".format(segments[0])]["volume"][0] ** (1.0/3.0))
+    kwargs["side_length"] = kwargs.get("side_length",np.mean(hdf5_file.load("*/log",type="table")["volume"])**(1.0/3.0))
     if    (force
-    or not segment + "/" + destination in hdf5_file):
+    or not [s + destination for s in segments] in hdf5_file):
             return [(dipole, kwargs)]
     else:   return False
 

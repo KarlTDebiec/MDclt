@@ -16,12 +16,13 @@ def dielectric(hdf5_file,
         verbose = False, n_cores = 1, **kwargs):
 
     # Calculate static dielectric constant
+    print time[-1]
     dipole *= 1.6021761206380539e-29
 
-    dipole              = np.sqrt(np.sum(dipole ** 2, axis = 1))
-    dipole_variance     = np.var(dipole)                                        #   C^2     m^2
+#    dipole              = np.sqrt(np.sum(dipole ** 2, axis = 1))
+#    dipole_variance     = np.var(dipole)                                        #   C^2     m^2
 
-#    dipole_variance     = np.mean(np.sum(dipole * dipole, axis = 1)) - np.dot(np.mean(dipole, axis = 0), np.mean(dipole, axis = 0))
+    dipole_variance     = np.mean(np.sum(dipole * dipole, axis = 1)) - np.dot(np.mean(dipole, axis = 0), np.mean(dipole, axis = 0))
 
 #    dipole_variance     = np.mean(np.sum(dipole ** 2, axis = 1)) - np.sum(np.mean(dipole, axis = 0) ** 2)
 
