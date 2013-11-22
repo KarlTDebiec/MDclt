@@ -99,16 +99,16 @@ def dipole(segments, destination, cms_file, side_length, **kwargs):
     last_sign    = None
     offset       = np.zeros_like(trj.xyz[0])
     segment      = segments.pop(0)
-    trj.xyz     *= 10
+    trj.xyz     *= 10.0
     while True:
         dipole       = np.zeros((trj.n_frames, 3))
         for i, frame in enumerate(trj.xyz):
-#            sign       = np.sign(frame)
-#            delta_sign = sign - last_sign if last_sign is not None else np.zeros_like(sign)
-#            last_sign  = sign
-#            offset[(delta_sign == -2) & (np.abs(frame) > inner_cutoff)] += side_length
-#            offset[(delta_sign ==  2) & (np.abs(frame) > inner_cutoff)] -= side_length
-#            frame     += offset
+            sign       = np.sign(frame)
+            delta_sign = sign - last_sign if last_sign is not None else np.zeros_like(sign)
+            last_sign  = sign
+            offset[(delta_sign == -2) & (np.abs(frame) > inner_cutoff)] += side_length
+            offset[(delta_sign ==  2) & (np.abs(frame) > inner_cutoff)] -= side_length
+            frame     += offset
             for residue in trj.topology.residues:
                 if residue.name != "T3P": continue
                 for atom in residue.atoms:
@@ -118,10 +118,14 @@ def dipole(segments, destination, cms_file, side_length, **kwargs):
         attrs = {"cms_file": cms_file, "method": "mdtraj", "units": "e A"}
         yield (segment + "/" + destination, dipole)
         yield (segment + "/" + destination, attrs)
+
+        trj.xyz /= 10.0
+        trj.save("{0}_unwrapped.xtc".format(segment))
+
         if len(segments) != 0:
-            segment = segments.pop(0)
-            trj = mdtraj.load(segment.trajectory, top = trj.topology)
-            trj.xyz *= 10
+            segment  = segments.pop(0)
+            trj      = mdtraj.load(segment.trajectory, top = trj.topology)
+            trj.xyz *= 10.0
         else:                  break
 def _check_dipole(hdf5_file, force = False, **kwargs):
     kwargs["segments"]    = segments    = [s for s in kwargs.get("segments", [])
