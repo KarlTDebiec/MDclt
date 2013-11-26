@@ -4,7 +4,7 @@ desc = """MD_toolkit.standard_functions.py
     Written by Karl Debiec on 13-02-03
     Last updated by Karl Debiec on 13-11-15"""
 ########################################### MODULES, SETTINGS, AND DEFAULTS ############################################
-import os, subprocess, sys
+import commands, os, subprocess, sys
 from   importlib import import_module
 import numpy as np
 ####################################################### CLASSES ########################################################
@@ -43,17 +43,17 @@ def segments_standard(sim_root):
     """ Lists segment files, topologies, and trajectories at <sim_root>, assuming the format ####/####.* """
     segments = []
     for seg_dir in sorted([f for f in os.listdir(sim_root) if is_num(f)]):
-        files       = ["{0}/{1}/{2}".format(sim_root, seg_dir, f)
-                        for f in os.listdir("{0}/{1}/".format(sim_root, seg_dir))]
-        topology    = "{0}/{1}/{1}_solute.pdb".format(sim_root, seg_dir)
-        trajectory  = "{0}/{1}/{1}_solute.xtc".format(sim_root, seg_dir)
-        if not os.path.isfile(topology):      topology   = None
-        if not os.path.isfile(trajectory):    trajectory = None
-        segments   += [Segment(number       = seg_dir,
-                               path         = "{0}/{1}/".format(sim_root, seg_dir),
-                               topology     = topology,
-                               trajectory   = trajectory,
-                               files        = files)]
+        files      = ["{0}/{1}/{2}".format(sim_root, seg_dir, f)
+                       for f in os.listdir("{0}/{1}/".format(sim_root, seg_dir))]
+        topology   = "{0}/{1}/{1}_solute.pdb".format(sim_root, seg_dir)
+        trajectory = "{0}/{1}/{1}_solute.xtc".format(sim_root, seg_dir)
+        if not os.path.isfile(topology):   topology   = None
+        if not os.path.isfile(trajectory): trajectory = None
+        segments  += [Segment(number     = seg_dir,
+                              path       = "{0}/{1}/".format(sim_root, seg_dir),
+                              topology   = topology,
+                              trajectory = trajectory,
+                              files      = files)]
     return segments
 ################################################## GENERAL FUNCTIONS ###################################################
 def is_num(test):
@@ -141,7 +141,7 @@ def _contact_1D_to_2D_indexes(n_res):
             i          += 1
     return indexes
 
-### mdtraj Topology
+######################################################## MDTRAJ ########################################################
 def topology_to_json(topology):
     """Generates a json string from a MDTraj topology
     Adapted from 'topology.py' in MDTraj"""
@@ -156,7 +156,7 @@ def topology_to_json(topology):
         chain_dict  = {"residues":  [], 
                        "index":     int(chain.index)}
 
-        residue_iter        = chain.residues
+        
         if not hasattr(residue_iter, "__iter__"):
             residue_iter    = residue_iter()
         for residue in residue_iter:
@@ -207,3 +207,102 @@ def topology_from_json(topology_json):
         topology.add_bond(atoms[index1], atoms[index2])
 
     return topology
+
+def load_charges_from_cms(trj, cms, verbose = False, debug = False, **kwargs):
+    """ Parses partial charge information from a Desmond/Anton <cms> topology/force field file and adds the results into
+        the topology of mdtraj trajectory <trj>. This function is not yet robust and care should be taken to make sure
+        it behaves as expected. """
+
+    # Load raw data from cms file
+    awk_command ="""
+        /sites/{ in_sites=1; in_atoms=0; next }
+        /\}/{    in_sites=0; in_atoms=0; next }
+        /:::/{
+            if (in_sites == 1) {
+                if (in_atoms == 0) {in_atoms = 1}
+                else               {in_atoms = 0}}}
+        in_atoms"""
+    command   = "cat {0} | awk '{1}' | grep -v :::".format(cms, awk_command)
+    raw_data  =  commands.getoutput(command).split("\n")
+    dtype     = np.dtype([("atom number", "i4"), ("residue number", "i4"), ("residue name", "S10"),
+                          ("charge",      "f4"), ("mass",           "f4"), ("vdw type",     "S10")])
+    if debug:
+        for line in raw_data:
+            print line
+    all_sites = np.array([(a,f,g,c,d,e) for a,b,c,d,e,f,g in [d.split() for d in raw_data]], dtype)
+    if verbose:
+        print "ALL SITES"
+        for s in all_sites: print s
+
+    # Separate solvent charge data from solute charge data
+    solute_sites  = all_sites[np.where((all_sites["residue name"] != "SPCE") &
+                                       (all_sites["residue name"] != "T3P")  & (all_sites["residue name"] != "TIP3")   &
+                                       (all_sites["residue name"] != "T4P")  & (all_sites["residue name"] != "TIP4")   &
+                                       (all_sites["residue name"] != "T4P5") & (all_sites["residue name"] != "TIP405") &
+                                       (all_sites["residue name"] != "Na+")  & (all_sites["residue name"] != "Cl-"))[0]]
+    solvent_sites = all_sites[np.where((all_sites["residue name"] == "SPCE") |
+                                       (all_sites["residue name"] == "T3P")  | (all_sites["residue name"] == "TIP3")   |
+                                       (all_sites["residue name"] == "T4P")  | (all_sites["residue name"] != "TIP4")   |
+                                       (all_sites["residue name"] == "T4P5") | (all_sites["residue name"] != "TIP405") |
+                                       (all_sites["residue name"] == "Na+")  | (all_sites["residue name"] == "Cl-"))[0]]
+    solvent_charge = {}
+    solvent_mass   = {}
+    for atom in solvent_sites:
+        if   (int(round(atom["mass"])) == 16):
+            solvent_charge["O"] = atom["charge"]
+            solvent_mass["O"]   = atom["mass"]
+        elif (int(round(atom["mass"])) ==  1):
+            solvent_charge["H"] = atom["charge"]
+            solvent_mass["H"]   = atom["mass"]
+    if verbose:
+        print "\nSOLUTE SITES"
+        for s in solute_sites: print s
+        print "\nSOLVENT SITES"
+        for s in solvent_sites: print s
+
+    # Copy charge information from cms file into mdtraj topology
+    for i, atom in enumerate(trj.topology.atoms):
+        if   i < solute_sites.size:
+            if   (int(round(atom.element.mass)) != int(round(solute_sites[i]["mass"]))):
+                raise Exception("MASSES OF ATOM {0} ({1}, {2}) DO NOT MATCH".format(
+                        i, atom.element.mass, solute_sites[i]["mass"]))
+            elif (atom.residue.name             != solute_sites[i]["residue name"]):
+                if   solute_sites[i]["residue name"].lower().startswith(atom.residue.name.lower()):     # Salt
+                    if verbose:
+                        print("RESIDUE NAMES of ATOM {0} ({1}, {2}) DO NOT MATCH, CONTINUING".format(
+                            i, atom.residue.name, solute_sites[i]["residue name"]))
+                elif solute_sites[i]["residue name"].lower().endswith(atom.residue.name.lower()):       # Termini
+                    if verbose:
+                        print("RESIDUE NAMES of ATOM {0} ({1}, {2}) DO NOT MATCH, CONTINUING".format(
+                            i, atom.residue.name, solute_sites[i]["residue name"]))
+                elif (solute_sites[i]["residue name"].lower().startswith("hi") and                      # Histidine
+                      atom.residue.name.lower().startswith("hi")):
+                    if verbose:
+                        print("RESIDUE NAMES of ATOM {0} ({1}, {2}) DO NOT MATCH, CONTINUING".format(
+                            i, atom.residue.name, solute_sites[i]["residue name"]))
+                elif (solute_sites[i]["residue name"].lower() == "tip3" and                             # TIP3P
+                      atom.residue.name.lower()            == "t3p"):
+                    if verbose:
+                        print("RESIDUE NAMES of ATOM {0} ({1}, {2}) DO NOT MATCH, CONTINUING".format(
+                            i, atom.residue.name, solute_sites[i]["residue name"]))
+                else:
+                    raise Exception("RESIDUE NAMES of ATOM {0} ({1}, {2}) DO NOT MATCH".format(
+                        i, solute_sites[i]["residue name"], atom.residue.name))
+            atom.charge = solute_sites[i]["charge"]
+            atom.mass   = solute_sites[i]["mass"]
+        elif ((int(round(atom.element.mass)) == 35)                                                     # Chloride
+        or    (atom.name.lower() == "cl" and atom.residue.name.lower() == "cl")):
+            atom.charge = -1.0
+            atom.mass   = 35.450000
+        elif ((int(round(atom.element.mass)) == 23)
+        or    (atom.name.lower() == "na" and atom.residue.name.lower() == "na")):                       # Sodium
+            atom.charge = 1.0
+            atom.mass   = 22.989770
+        elif (atom.residue.name in ["HOH", "WAT", "T3P", "T4P", "T4P5", "SPC"]):                        # Water
+            if atom.name == "pseu": continue
+            atom.charge = solvent_charge[atom.name[0]]
+            atom.mass   = solvent_mass[atom.name[0]]
+        else:
+            raise Exception("UNRECOGNIZED ATOM {0} in RESIDUE {1}".format(atom.name, atom.residue.name))
+
+

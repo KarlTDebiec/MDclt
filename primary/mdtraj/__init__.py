@@ -2,7 +2,7 @@
 desc = """MD_toolkit.primary.mdtraj.__init__.py
     Functions for primary analysis of MD trajectories
     Written by Karl Debiec on 13-10-30
-    Last updated by Karl Debiec on 13-11-17"""
+    Last updated by Karl Debiec on 13-11-24"""
 ########################################### MODULES, SETTINGS, AND DEFAULTS ############################################
 import commands, os, sys, types, warnings
 import numpy as np
@@ -11,6 +11,73 @@ with warnings.catch_warnings():
     import mdtraj
 from MD_toolkit.standard_functions import topology_to_json
 ################################################## ANALYSIS FUNCTIONS ##################################################
+def dipole(segment, destination, solvent, verbose = True, **kwargs):
+    """ Calculates dipole moment of solvent molecules in the system. Uses partial charges for <solvent> and calculates
+        and includes pseudoatoms if applicable. """
+
+    # Prepare charges for selected solute
+    if   solvent.lower() in ["spce"]:            O_chg, H_chg, M_chg, resnames = -0.83400, 0.41700, None,     ["SPC"]
+    elif solvent.lower() in ["tip3p", "tips3p"]: O_chg, H_chg, M_chg, resnames = -0.84760, 0.42380, None,     ["T3P"]
+    elif solvent.lower() in ["tip4p"]:           O_chg, H_chg, M_chg, resnames =  0.0,     0.52000, -1.04000, ["T4P"]
+    elif solvent.lower() in ["tip4p2005"]:       O_chg, H_chg, M_chg, resnames =  0.0,     0.55640, -1.11280, ["T4P5"]
+    elif solvent.lower() in ["tip4pew"]:         O_chg, H_chg, M_chg, resnames =  0.0,     0.52422, -1.04844, ["T4PE"]
+
+    # Load trajectory and partial charges
+    trj      = mdtraj.load(segment.trajectory, top = segment.topology)
+    trj.xyz *= 10.0                                                             # nm -> A
+
+    # Configure arrays for atom indexes and charges
+    all_indexes = []
+    chg_indexes = []
+    charges     = []
+    for residue in trj.topology.residues:
+        if verbose and not residue.name in resnames:
+            print "WARNING: RESIDUE NAME {0} DOES NOT MATCH EXPECTED ({1})".format(atom.residue.name, resnames)
+        else:
+            O  = [atom for atom in residue.atoms if atom.name == "O"][0]        # Order of atoms is required for
+            H1 = [atom for atom in residue.atoms if atom.name == "H1"][0]       # pseudoatom calculation
+            H2 = [atom for atom in residue.atoms if atom.name == "H2"][0]
+            all_indexes     += [[O.index, H1.index, H2.index]]
+            if O_chg == 0.0:                                                    # If Oxygen's charge is 0, we do not
+                chg_indexes += [H1.index, H2.index]                             # need to consider it in the dipole
+                charges     += [H_chg,    H_chg]                                # calculation
+            else:
+                chg_indexes += [O.index, H1.index, H2.index]
+                charges     += [O_chg,   H_chg,    H_chg]
+    all_indexes = np.array(all_indexes)
+    chg_indexes = np.array(chg_indexes)
+    charges     = np.array(charges)
+    charges     = np.column_stack((charges, charges, charges))
+
+    # Calculate dipole vector for each trajectory frame
+    dipole             = np.zeros((trj.n_frames, 3))
+    for i, frame in enumerate(trj.xyz):
+        dipole[i]      = np.sum(frame[chg_indexes] * charges, axis = 0)
+        if M_chg is not None:                                                   # Calculate pseudoatom contribution
+            pseudo     = ((frame[all_indexes[:,1]] + frame[all_indexes[:,2]]) / 2.0) - frame[all_indexes[:,0]]
+            mag        = 0.15 / np.sqrt(np.sum(pseudo*pseudo, axis = 1))
+            pseudo    *= np.column_stack((mag, mag, mag))
+            pseudo    += frame[all_indexes[:,0],:]
+            dipole[i] += np.sum(pseudo * M_chg, axis = 0)
+        if verbose and i % 100 == 0:
+            print i, dipole[i], np.mean(np.sqrt(np.sum(dipole[:i] ** 2, axis = 1)))
+
+    # Configure and return results
+    attrs = {"method": "mdtraj", "units": "e A", "number of waters": all_indexes.shape[0]}
+    return [(segment + "/" + destination, dipole),
+            (segment + "/" + destination, attrs)]
+def _check_dipole(hdf5_file, segment, force = False, **kwargs):
+    if not (segment.topology   and os.path.isfile(segment.topology)
+    and     segment.trajectory and os.path.isfile(segment.trajectory)):
+            return False
+    kwargs["destination"] = destination = kwargs.get("destination", "dipole")
+    kwargs["solvent"]                   = kwargs.get("solvent",     "TIP3P")
+    if    (force
+    or not segment + "/" + destination in hdf5_file):
+            return [(dipole, segment, kwargs)]
+    else:   return False
+
+
 def coordinates(segment, **kwargs):
     """ Loads coordinates in format compatible with mdtraj """
     trajectory          = mdtraj.load(segment.trajectory, top = segment.topology)
@@ -72,6 +139,7 @@ def com_resname(segment, destination, resname, **kwargs):
             com[i][j] = np.sum(trj.xyz[i][index] * masses[j], axis = 0) / total_mass[j]
     return  [(segment + "/" + destination, com * 10.0),
              (segment + "/" + destination, {"resname": resname_str[:-1], "method": "mdtraj", "units": "A"})]
+
 def _check_com_resname(hdf5_file, segment, force = False, **kwargs):
     if not (segment.topology   and os.path.isfile(segment.topology)
     and     segment.trajectory and os.path.isfile(segment.trajectory)):

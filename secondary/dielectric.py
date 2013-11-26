@@ -33,7 +33,13 @@ def dielectric(hdf5_file,
     print np.mean(dipole * 1.6021761206380539e-29)
     print dipole_variance
     print vacuum_permittivity, volume, boltzmann, temperature
-    print epsilon
+    print "COMPLETE   ", epsilon
+    cut_dipole  = dipole[:dipole.shape[0]//2]
+    dipole_variance     = np.mean(np.sum(cut_dipole * cut_dipole, axis = 1)) - np.dot(np.mean(cut_dipole, axis = 0), np.mean(cut_dipole, axis = 0))
+    print "FIRST HALF ", 1 + dipole_variance / (3.0 * vacuum_permittivity * volume * boltzmann * temperature)
+    cut_dipole  = dipole[dipole.shape[0]//2:]
+    dipole_variance     = np.mean(np.sum(cut_dipole * cut_dipole, axis = 1)) - np.dot(np.mean(cut_dipole, axis = 0), np.mean(cut_dipole, axis = 0))
+    print "SECOND HALF", 1 + dipole_variance / (3.0 * vacuum_permittivity * volume * boltzmann * temperature)
     # Organize and return data
 #    data    = np.array([tuple(D) for D in data], np.dtype(dtype))
 #    attrs   = {"time": "{0:.3f} {1:.3f}".format(float(time[0]), float(time[-1])),
