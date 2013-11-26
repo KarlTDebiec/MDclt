@@ -16,11 +16,16 @@ def dipole(segment, destination, solvent, verbose = True, **kwargs):
         and includes pseudoatoms if applicable. """
 
     # Prepare charges for selected solute
-    if   solvent.lower() in ["spce"]:            O_chg, H_chg, M_chg, resnames = -0.83400, 0.41700, None,     ["SPC"]
-    elif solvent.lower() in ["tip3p", "tips3p"]: O_chg, H_chg, M_chg, resnames = -0.84760, 0.42380, None,     ["T3P"]
-    elif solvent.lower() in ["tip4p"]:           O_chg, H_chg, M_chg, resnames =  0.0,     0.52000, -1.04000, ["T4P"]
-    elif solvent.lower() in ["tip4p2005"]:       O_chg, H_chg, M_chg, resnames =  0.0,     0.55640, -1.11280, ["T4P5"]
-    elif solvent.lower() in ["tip4pew"]:         O_chg, H_chg, M_chg, resnames =  0.0,     0.52422, -1.04844, ["T4PE"]
+    if   solvent.lower() in ["spce"]:
+        O_chg, H_chg, M_chg, resnames = -0.83400, 0.41700, None,     ["HOH", "SPC"]
+    elif solvent.lower() in ["tip3p", "tips3p"]:
+        O_chg, H_chg, M_chg, resnames = -0.84760, 0.42380, None,     ["HOH", "T3P"]
+    elif solvent.lower() in ["tip4p"]:
+        O_chg, H_chg, M_chg, resnames =  0.0,     0.52000, -1.04000, ["HOH", "T4P"]
+    elif solvent.lower() in ["tip4p2005"]:
+        O_chg, H_chg, M_chg, resnames =  0.0,     0.55640, -1.11280, ["HOH", "T4P5"]
+    elif solvent.lower() in ["tip4pew"]:
+        O_chg, H_chg, M_chg, resnames =  0.0,     0.52422, -1.04844, ["HOH", "T4PE"]
 
     # Load trajectory and partial charges
     trj      = mdtraj.load(segment.trajectory, top = segment.topology)
@@ -32,13 +37,13 @@ def dipole(segment, destination, solvent, verbose = True, **kwargs):
     charges     = []
     for residue in trj.topology.residues:
         if verbose and not residue.name in resnames:
-            print "WARNING: RESIDUE NAME {0} DOES NOT MATCH EXPECTED ({1})".format(atom.residue.name, resnames)
+            print "WARNING: RESIDUE NAME {0} DOES NOT MATCH EXPECTED ({1})".format(residue.name, resnames)
         else:
             O  = [atom for atom in residue.atoms if atom.name == "O"][0]        # Order of atoms is required for
             H1 = [atom for atom in residue.atoms if atom.name == "H1"][0]       # pseudoatom calculation
             H2 = [atom for atom in residue.atoms if atom.name == "H2"][0]
             all_indexes     += [[O.index, H1.index, H2.index]]
-            if O_chg == 0.0:                                                    # If Oxygen's charge is 0, we do not
+            if O_chg == 0.0:                                                    # If oxygen's charge is 0, we do not
                 chg_indexes += [H1.index, H2.index]                             # need to consider it in the dipole
                 charges     += [H_chg,    H_chg]                                # calculation
             else:

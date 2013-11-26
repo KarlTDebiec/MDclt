@@ -114,6 +114,7 @@ def analyze_secondary(hdf5_filename, analyses, n_cores = 1, verbose = True, **kw
     with HDF5_File(hdf5_filename) as hdf5_file:
         task_list = []
         for module_function, kwargs in analyses:
+            kwargs["verbose"] = kwargs.get("verbose", verbose)
             module   = ".".join(module_function.split(".")[:-1])
             function = module_function.split(".")[-1]
             if module_function.startswith("custom"):

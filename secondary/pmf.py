@@ -49,7 +49,7 @@ def pmf_1D(hdf5_file,
     attrs   = {"lower bound units": "A", "upper bound units": "A", "free energy units": "kBT",
                "pmf units": "kcal mol-1", "temperature": temperature, "zero_point": zero_point,
                "time": "{0:.3f} {1:.3f}".format(float(time[0]), float(time[-1]))}
-    if verbose: _print_pmf_1D(pcoord, data, attrs)
+    if verbose: _print_pmf_1D(destination, data, attrs)
     return  [(destination, data),
              (destination, attrs)]
 
@@ -108,11 +108,13 @@ def _check_pmf_1D(hdf5_file, force = False, **kwargs):
         return [(pmf_1D, kwargs)]
 
     # If analysis has been run previously with the same settings, output data and return
-    if kwargs.get("verbose", False): _print_pmf_1D(pcoord, data, attrs)
+    if kwargs.get("verbose", False): _print_pmf_1D(destination, data, attrs)
     return False
 
-def _print_pmf_1D(pcoord, data, attrs):
-    print "DURATION {0:5d} ns PROGRESS COORDINATE {1} ".format(int(attrs["time"]),   pcoord.upper())
+def _print_pmf_1D(destination, data, attrs):
+    print "TIME     {0:.3f} ns - {1:.3f} ns".format(*map(float, attrs["time"].split()))
+    print "DURATION {0:.3f} ns".format(float(attrs["time"].split()[1]) - float(attrs["time"].split()[0]))
+    print "PROGRESS COORDINATE {0} ".format(destination.upper())
     print "TEMPERAUTRE {0:6.3f} K ZERO POINT {1}".format(float(attrs["temperature"]), attrs["zero_point"])
     print "  LOWER  UPPER  COUNT        P      FE     PMF"
     for line in data:

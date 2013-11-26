@@ -56,6 +56,10 @@ def segments_standard(sim_root):
                               files      = files)]
     return segments
 ################################################## GENERAL FUNCTIONS ###################################################
+def ignore_index(time, ignore):
+    if   ignore <  0:   return np.where(time > time[-1] + ignore - (time[1] - time[0]))[0][0]
+    elif ignore == 0:   return 0
+    elif ignore >  0:   return np.where(time > ignore)[0][0]
 def is_num(test):
     try:    float(test)
     except: return False
@@ -101,15 +105,15 @@ def fit_curve(fit_func = "single_exponential", **kwargs):
         warnings.simplefilter("ignore")
         def single_exponential(x, y, **kwargs):
             def func(x, a, b, c):       return a + b * np.exp(c * x)
-            a, b, c         = curve_fit(func, x, y, **kwargs)[0]
+            a, b, c       = curve_fit(func, x, y, **kwargs)[0]
             return a, b, c, func(x, a, b, c)
         def double_exponential(x, y, **kwargs):
             def func(x, a, b, c, d, e): return a + b * np.exp(c * x) + d * np.exp(e * x)
-            a, b, c, d, e   = curve_fit(func, x, y, **kwargs)[0]
+            a, b, c, d, e = curve_fit(func, x, y, **kwargs)[0]
             return a, b, c, d, e, func(x, a, b, c, d, e)
         def sigmoid(x, y, **kwargs):
             def func(x, a, b, c, d):    return b + (a - b) / (1.0 + (x / c) ** d)
-            a, b, c, d      = curve_fit(func, x, y, **kwargs)[0]
+            a, b, c, d    = curve_fit(func, x, y, **kwargs)[0]
             return a, b, c, d, func(x, a, b, c, d)
         return locals()[fit_func](**kwargs)
 ################################################## ANALYSIS FUNCTIONS ##################################################
