@@ -46,11 +46,11 @@ def dielectric(hdf5_file,
     dielectric_se, b, c, fit = fit_curve(x = np.array(sizes, np.float), y = ses, sigma = se_sds,
                                          fit_func = "single_exponential", p0 =(1.0, -1.0, -1.0))
     # Organize, print, and return data
-    data    = np.array((dielectric, dielectric_se), [("dielectric", "f4"), ("dielectric se", "f4")])
+    data    = np.array([(dielectric, dielectric_se)], [("dielectric", "f4"), ("dielectric se", "f4")])
     attrs   = {"time": "{0:.3f} {1:.3f}".format(float(time[0]), float(time[-1])),
                "volume": volume / 1e-30, "temperature": temperature}
     if verbose: _print_dielectric(data, attrs)
-    return  [(destination, data, {"data_kwargs": {"chunks": False}}),
+    return  [(destination, data),
              (destination, attrs)]
 
 def _check_dielectric(hdf5_file, force = False, **kwargs):
