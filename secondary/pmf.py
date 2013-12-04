@@ -35,7 +35,7 @@ def pmf_1D(hdf5_file,
             else:                       zero_start, zero_end = zero_point.split()
             zero_start      = np.abs(bins - float(zero_start)).argmin()
             zero_end        = np.abs(bins - float(zero_end)).argmin()
-            value_at_zero   = np.mean(pmf[zero_start:zero_end])
+            value_at_zero   = np.mean(np.ma.MaskedArray(pmf[zero_start:zero_end], np.isnan(pmf[zero_start:zero_end])))
         else:
             value_at_zero   = pmf[np.abs(centers - zero_point).argmin()]
         pmf                -= value_at_zero
@@ -60,7 +60,7 @@ def _check_pmf_1D(hdf5_file, force = False, **kwargs):
         if   ignore <  0:   return np.where(time > time[-1] + ignore - (time[1] - time[0]))[0][0]
         elif ignore == 0:   return 0
         elif ignore >  0:   return np.where(time > ignore)[0][0]
-    def _load_association(self, path, bins, ignore_index, **kwargs):
+    def _load_association(self, path, bins, ignore_index, closest = False, **kwargs):
         data            = np.zeros(bins.size - 1, np.int32)
         for segment in self._segments():
             new_data    = self[segment + "/" + path[2:]]
@@ -70,14 +70,17 @@ def _check_pmf_1D(hdf5_file, force = False, **kwargs):
             elif ignore_index > 0:
                 new_data        = new_data[ignore_index:]
                 ignore_index    = 0
-            hist, _     = np.histogram(new_data, bins)
-            data       += hist
+            if closest:
+                new_data    = np.min(new_data, axis = 2)
+            hist, _         = np.histogram(new_data, bins)
+            data           += hist
         return data
 
     # Parse kwargs and set defaults
     source                              = kwargs.pop("source",      "*/association_mindist")
     source                              = source if source.startswith("*/") else "*/" + source
     ignore                              = kwargs.pop("ignore",      0)
+    closest                             = kwargs.get("closest",     False)
     kwargs["bins"]        = bins        = kwargs.get("bins",        np.linspace(0, 100, 101))
     kwargs["zero_point"]  = zero_point  = kwargs.get("zero_point",  np.nan)
     kwargs["temperature"] = temperature = kwargs.get("temperature", 298.0)
@@ -89,7 +92,8 @@ def _check_pmf_1D(hdf5_file, force = False, **kwargs):
         log             = hdf5_file.load("*/log", type = "table")
         ignore_index    = _ignore_index(log["time"], ignore)
         kwargs["time"]  = log["time"][ignore_index:]
-        kwargs["count"] = hdf5_file.load(source, loader = _load_association, bins = bins, ignore_index = ignore_index)
+        kwargs["count"] = hdf5_file.load(source, loader = _load_association,
+                                         bins = bins, ignore_index = ignore_index, closest = closest)
         return [(pmf_1D, kwargs)]
 
     # If analysis has been run previously but with different settings, run analysis
@@ -104,7 +108,8 @@ def _check_pmf_1D(hdf5_file, force = False, **kwargs):
     or (np.any(data["lower bound"]   != np.array(bins[:-1], np.float32)))
     or (np.any(data["upper bound"]   != np.array(bins[1:],  np.float32)))
     or (attrs["time"]                != "{0:.3f} {1:.3f}".format(float(kwargs["time"][0]), float(kwargs["time"][-1])))):
-        kwargs["count"] = hdf5_file.load(source, loader = _load_association, bins = bins, ignore_index = ignore_index)
+        kwargs["count"] = hdf5_file.load(source, loader = _load_association,
+                                         bins = bins, ignore_index = ignore_index, closest = closest)
         return [(pmf_1D, kwargs)]
 
     # If analysis has been run previously with the same settings, output data and return
