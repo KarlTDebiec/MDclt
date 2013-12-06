@@ -114,6 +114,7 @@ def analyze_secondary(hdf5_filename, analyses, n_cores = 1, verbose = True, **kw
     with HDF5_File(hdf5_filename) as hdf5_file:
         task_list = []
         for module_function, kwargs in analyses:
+            if verbose: print
             kwargs["verbose"] = kwargs.get("verbose", verbose)
             module   = ".".join(module_function.split(".")[:-1])
             function = module_function.split(".")[-1]
@@ -132,6 +133,7 @@ def analyze_secondary(hdf5_filename, analyses, n_cores = 1, verbose = True, **kw
                 task_list     += new_tasks
 
         for function, kwargs in task_list:
+            if verbose: print
             kwargs["n_cores"] = n_cores
             results = function(hdf5_file, **kwargs)
             if  not results:            continue

@@ -97,7 +97,7 @@ class HDF5_File:
     def load(self, path, destination = None, type = "array", **kwargs):
         if not destination: destination  = path
         if not self.file:   self._open_file()
-        if   "loader" in kwargs:                       loader = Function_to_Method_Wrapper(self, kwargs.get("loader"))
+        if   "loader" in kwargs:                       loader = Function_to_Method_Wrapper(self, kwargs.pop("loader"))
         elif type == "array" and path.startswith("*"): loader = self._load_split_array
         elif type == "array":                          loader = self._load_whole_array
         elif type == "table" and path.startswith("*"): loader = self._load_split_table

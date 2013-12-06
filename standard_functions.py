@@ -95,8 +95,9 @@ def block_average(data, func = np.mean, func_kwargs = {"axis": 1}, min_size = 1,
         values  = func(resized, **func_kwargs)
         sds[i]  = np.std(values)
     ses                 = sds / np.sqrt(n_blocks - 1.0)
-    se_sds              = np.sqrt((2.0) / (n_blocks - 1.0)) * ses
-    se_sds[se_sds == 0] = se_sds[np.where(se_sds == 0)[0] + 1]
+#    se_sds              = np.sqrt((2.0) / (n_blocks - 1.0)) * ses
+    se_sds              = (1.0 / np.sqrt(2.0 * (n_blocks - 1.0))) * ses
+#    se_sds[se_sds == 0] = se_sds[np.where(se_sds == 0)[0] + 1]
     return sizes, ses, se_sds
 def fit_curve(fit_func = "single_exponential", **kwargs):
     import warnings

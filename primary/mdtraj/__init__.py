@@ -11,7 +11,7 @@ with warnings.catch_warnings():
     import mdtraj
 from MD_toolkit.standard_functions import topology_to_json
 ################################################## ANALYSIS FUNCTIONS ##################################################
-def dipole(segment, destination, solvent, verbose = True, **kwargs):
+def dipole(segment, destination, solvent, verbose = False, **kwargs):
     """ Calculates dipole moment of solvent molecules in the system. Uses partial charges for <solvent> and calculates
         and includes pseudoatoms if applicable. """
 

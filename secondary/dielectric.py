@@ -16,7 +16,6 @@ def block(data, func, min_size = 3):
     n_blocks    = full_size // sizes
     for i, size in enumerate(sizes):
         resized = np.resize(data, (full_size // size, size, 3))
-        map(func, resized)
         values  = map(func, resized)
         sds[i]  = np.std(values)
     ses                 = sds / np.sqrt(n_blocks - 1.0)
