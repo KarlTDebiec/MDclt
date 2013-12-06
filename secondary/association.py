@@ -280,7 +280,6 @@ def exchange(hdf5_file,
     for j in range(n_molecule_1):
         for k in range(n_molecule_2):
             # Load distance data for j, k pair only
-            print "loading pair", j, k
             distance    = hdf5_file.load(source, loader = load_distance, j = j, k = k, n_frames = n_frames, index = index)
 
             # Assign to bound (1) and unbound (0) states
@@ -314,57 +313,65 @@ def exchange(hdf5_file,
 
             # Calculate standard error of Pbound using block averaging
             sizes, ses, se_sds      = block_average(bound)
-            a, Pbound_se, c, d, fit = fit_curve(x = sizes, y = ses, sigma = se_sds, fit_func = "sigmoid")
+            try:    a, Pbound_se, c, d, fit = fit_curve(x = sizes, y = ses, sigma = se_sds, fit_func = "sigmoid")
+            except:    Pbound_se            = np.nan
 
             # Calculate mean first passage time
             trans_bound     = bound[:-1] - bound[1:]
             enter_bound     = np.where(trans_bound  == -1)[0] + 1
             enter_unbound   = np.where(trans_bound  ==  1)[0] + 1
-            if   enter_bound[0] < enter_unbound[0] and enter_bound[-1] < enter_unbound[-1]:         # Started unbound,
-                fpt_on   = enter_bound[1:]   - enter_unbound[:-1]                                   #   ended unbound
-                fpt_off  = enter_unbound     - enter_bound
-                events  += [(j, k, bind, unbind, unbind - bind)
-                               for bind, unbind in np.column_stack((enter_bound, enter_unbound))] 
-            elif enter_bound[0] < enter_unbound[0] and enter_bound[-1] > enter_unbound[-1]:         # Started unbound,
-                fpt_on   = enter_bound[1:]   - enter_unbound                                        #   ended bound
-                fpt_off  = enter_unbound     - enter_bound[:-1]
-                events  += [(j, k, bind, unbind, unbind - bind)
-                               for bind, unbind in np.column_stack((enter_bound[:-1], enter_unbound))] 
-            elif enter_bound[0] > enter_unbound[0] and enter_bound[-1] < enter_unbound[-1]:         # Started bound,
-                fpt_on   = enter_bound       - enter_unbound[:-1]                                   #   ended unbound
-                fpt_off  = enter_unbound[1:] - enter_bound
-                events  += [(j, k, bind, unbind, unbind - bind)
-                               for bind, unbind in np.column_stack((enter_bound, enter_unbound[1:]))] 
-            elif enter_bound[0] > enter_unbound[0] and enter_bound[-1] > enter_unbound[-1]:         # Started bound,
-                fpt_on   = enter_bound       - enter_unbound                                        #   ended bound
-                fpt_off  = enter_unbound[1:] - enter_bound[:-1]
-                events  += [(j, k, bind, unbind, unbind - bind)
-                               for bind, unbind in np.column_stack((enter_bound[:-1] * dt, enter_unbound[1:] * dt))] 
+            if enter_bound.size >= 1 and enter_unbound.size >= 1:
+                if   enter_bound[0] < enter_unbound[0] and enter_bound[-1] < enter_unbound[-1]:     # Started unbound,
+                    fpt_on   = enter_bound[1:]   - enter_unbound[:-1]                               #   ended unbound
+                    fpt_off  = enter_unbound     - enter_bound
+                    events  += [(j, k, bind, unbind, unbind - bind)
+                                   for bind, unbind in np.column_stack((enter_bound, enter_unbound))] 
+                elif enter_bound[0] < enter_unbound[0] and enter_bound[-1] > enter_unbound[-1]:     # Started unbound,
+                    fpt_on   = enter_bound[1:]   - enter_unbound                                    #   ended bound
+                    fpt_off  = enter_unbound     - enter_bound[:-1]
+                    events  += [(j, k, bind, unbind, unbind - bind)
+                                   for bind, unbind in np.column_stack((enter_bound[:-1], enter_unbound))] 
+                elif enter_bound[0] > enter_unbound[0] and enter_bound[-1] < enter_unbound[-1]:     # Started bound,
+                    fpt_on   = enter_bound       - enter_unbound[:-1]                               #   ended unbound
+                    fpt_off  = enter_unbound[1:] - enter_bound
+                    events  += [(j, k, bind, unbind, unbind - bind)
+                                   for bind, unbind in np.column_stack((enter_bound, enter_unbound[1:]))] 
+                elif enter_bound[0] > enter_unbound[0] and enter_bound[-1] > enter_unbound[-1]:     # Started bound,
+                    fpt_on   = enter_bound       - enter_unbound                                    #   ended bound
+                    fpt_off  = enter_unbound[1:] - enter_bound[:-1]
+                    events  += [(j, k, bind, unbind, unbind - bind)
+                                   for bind, unbind in np.column_stack((enter_bound[:-1] * dt, enter_unbound[1:] * dt))] 
+            else:
+                fpt_on  = np.array([])
+                fpt_off = np.array([])
 
             # Organize data
             count[:, j]            += bound
             data[j,k]["Pbound"]     = Pbound[-1]
             data[j,k]["Pbound se"]  = Pbound_se
-            data[j,k]["fpt on"]     = np.mean(fpt_on)
-            data[j,k]["fpt on se"]  = np.std(fpt_on) / np.sqrt(fpt_on.size)
-            data[j,k]["fpt off"]    = np.mean(fpt_off)
-            data[j,k]["fpt off se"] = np.std(fpt_off) / np.sqrt(fpt_off.size)
-
+            data[j,k]["fpt on"]     = np.mean(fpt_on)                         if fpt_on.size  != 0 else np.nan
+            data[j,k]["fpt on se"]  = np.std(fpt_on) / np.sqrt(fpt_on.size)   if fpt_on.size  != 0 else np.nan
+            data[j,k]["fpt off"]    = np.mean(fpt_off)                        if fpt_off.size != 0 else np.nan
+            data[j,k]["fpt off se"] = np.std(fpt_off) / np.sqrt(fpt_off.size) if fpt_off.size != 0 else np.nan
 
     # Organize and return data
     count_attrs  = {"histogram": " ".join([str(count[count == i].size) for i in range (0, np.max(count) + 1)])}
     events       = np.array(events, [("index 1", "i4"), ("index 2", "i4"), ("start", "f4"), ("end", "f4"),
                                              ("duration", "f4")])
-    events_attrs = {"duration_mean":   np.mean(events["duration"]), "duration_std":    np.std(events["duration"]),
+    events_attrs = {"duration_mean":   np.mean(events["duration"]),
+                    "duration_std":    np.std(events["duration"]),
                     "N_events":        events.size}
-    Pbound_attrs = {"Pbound_mean":     np.mean(data["Pbound"]),     "Pbound_std":      np.std(data["Pbound"]),
-                    "fpt_on_mean":     np.mean(data["fpt on"]),     "fpt_on_std":      np.std(data["fpt on"]),
-                    "fpt_off_mean":    np.mean(data["fpt off"]),    "fpt_off_std":     np.std(data["fpt off"])}
-    attrs        = {"n_molecule_1":    n_molecule_1,                "n_molecule_2":    n_molecule_2,
-                    "concentration_1": C_mol1_total,                "concentration_2": C_mol2_total,
-                    "bound_cutoff":    float(bound_cutoff),         "unbound_cutoff":  float(unbound_cutoff),
+    Pbound_attrs = {"Pbound_mean":     np.mean(np.ma.MaskedArray(data["Pbound"],  np.isnan(data["Pbound"]))),
+                    "Pbound_std":      np.std(np.ma.MaskedArray(data["Pbound"],   np.isnan(data["Pbound"]))),
+                    "fpt_on_mean":     np.mean(np.ma.MaskedArray(data["fpt on"],  np.isnan(data["fpt on"]))),
+                    "fpt_on_std":      np.std(np.ma.MaskedArray(data["fpt on"],   np.isnan(data["fpt on"]))),
+                    "fpt_off_mean":    np.mean(np.ma.MaskedArray(data["fpt off"], np.isnan(data["fpt off"]))),
+                    "fpt_off_std":     np.std(np.ma.MaskedArray(data["fpt off"],  np.isnan(data["fpt off"])))}
+    attrs        = {"n_molecule_1":    n_molecule_1,        "n_molecule_2":    n_molecule_2,
+                    "concentration_1": C_mol1_total,        "concentration_2": C_mol2_total,
+                    "bound_cutoff":    float(bound_cutoff), "unbound_cutoff":  float(unbound_cutoff),
                     "volume":          volume * 1e27,
-                    "time": "{0:.3f} {1:.3f}".format(float(time[0]), float(time[-1]))}
+                    "time":            "{0:.3f} {1:.3f}".format(float(time[0]), float(time[-1]))}
     if verbose:    _print_exchange(destination, attrs, Pbound_attrs, count_attrs, events_attrs)
     return  [(destination + "/pairs/count",  count),
              (destination + "/pairs/count",  count_attrs),
