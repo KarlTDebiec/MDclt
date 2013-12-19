@@ -89,11 +89,11 @@ def _check_water(hdf5_file, force = False, **kwargs):
         return [(water, kwargs)]
 
     # If analysis has been run previously but with different settings, run analysis
-    data            = hdf5_file[destination]
-    attrs           = hdf5_file.attrs(destination)
-    log             = hdf5_file.load("*/log", type = "table")
-    ignore_index    = _ignore_index(log["time"], ignore)
-    kwargs["time"]  = log["time"][ignore_index:]
+    data                                  = hdf5_file[destination]
+    attrs                                 = hdf5_file.attrs(destination)
+    log                                   = hdf5_file.load("*/log", type = "table")
+    kwargs["ignore_index"] = ignore_index = _ignore_index(log["time"], ignore)
+    kwargs["time"]                        = log["time"][ignore_index:]
     if (np.any(data["delta t"] != np.array(delta_ts, np.float32))
     or (attrs["time"]          != "{0:.3f} {1:.3f}".format(float(kwargs["time"][0]), float(kwargs["time"][-1])))):
         return [(water, kwargs)]

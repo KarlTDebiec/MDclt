@@ -2,13 +2,39 @@
 desc = """MD_toolkit.primary.mdanalysis.association.py
     Functions for primary analysis of molecular association using MDAnalysis
     Written by Karl Debiec on 12-11-30
-    Last updated by Karl Debiec on 13-11-15"""
-########################################### MODULES, SETTINGS, AND DEFAULTS ############################################
+    Last updated by Karl Debiec on 13-12-18"""
+####################################################### MODULES ########################################################
 import os, sys
 import numpy as np
 import MDAnalysis as md
 from   cython_functions import _cy_distance_pbc
 ################################################## ANALYSIS FUNCTIONS ##################################################
+def dist(segment, destination, selection_1, selection_2, **kwargs):
+    """ Calculates interatomic distances between <selection_1> and <selection_2>, accounting for cubic pbc """
+
+    # Load trajectory and selections
+    trj         = md.Universe(segment.topology, segment.trajectory)
+    selection_1 = trj.selectAtoms(selection_1)
+    selection_2 = trj.selectAtoms(selection_2)
+    side_length = float(trj.dimensions[0])
+
+    # Calculate interatomic distances
+    distance    = np.zeros((len(trj.trajectory), len(selection_1), len(selection_2)), np.float32)
+    for i, frame in enumerate(trj.trajectory):
+        distance[i] = _cy_distance_pbc(selection_1.coordinates(), selection_2.coordinates(), side_length)
+    return  [(segment + "/" + destination,  distance)]
+def _check_dist(hdf5_file, segment, force = False, **kwargs):
+    if not (segment.topology   and os.path.isfile(segment.topology)
+    and     segment.trajectory and os.path.isfile(segment.trajectory)):
+            return False
+    kwargs["destination"] = destination = kwargs.get("destination", "association_dist")
+    kwargs["selection_1"] =               kwargs.get("selection_1", "(name C* or name N* or name O* or name S*")
+    kwargs["selection_2"] =               kwargs.get("selection_2", "(name C* or name N* or name O* or name S*")
+    if    (force
+    or not segment + "/" + destination in hdf5_file):
+            return [(dist, segment, kwargs)]
+    else:   return False
+
 def comdist(segment, selection_1, selection_2, mode = "residue", **kwargs):
     """ Calculates center of mass distance between two selections or residue types; assumes cubic box and pbc """
     trj         = md.Universe(segment.topology, segment.trajectory)
