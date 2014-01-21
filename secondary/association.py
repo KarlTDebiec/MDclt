@@ -222,7 +222,7 @@ def _print_rate(address, attrs, Pbound_attrs, fpt_attrs):
     print "TIME     {0:.3f} ns - {1:.3f} ns".format(*map(float, attrs["time"].split()))
     print "DURATION {0:.3f} ns".format(float(attrs["time"].split()[1]) - float(attrs["time"].split()[0]))
     print "DATASET  {0}".format(address)
-    print "BOUND < {0:3.1f} A UNBOUND > {1:3.1f} A".format(attrs["bound_cutoff"],         attrs["unbound_cutoff"])
+    print "BOUND < {0:4.2f} A UNBOUND > {1:4.2f} A".format(attrs["bound_cutoff"],         attrs["unbound_cutoff"])
     print "VOLUME       {0:d} A^3".format(int(attrs["volume"]))
     print "[MOLECULE 1] {0:4.3f} M".format(float(attrs["concentration_1"]))
     print "[MOLECULE 2] {0:4.3f} M".format(float(attrs["concentration_2"]))

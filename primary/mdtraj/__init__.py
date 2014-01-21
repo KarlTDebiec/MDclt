@@ -11,21 +11,21 @@ with warnings.catch_warnings():
     import mdtraj
 from MD_toolkit.standard_functions import topology_to_json
 ################################################## ANALYSIS FUNCTIONS ##################################################
-def dipole(segment, destination, solvent, verbose = False, **kwargs):
+def dipole(segment, destination, solvent, verbose = True, **kwargs):
     """ Calculates dipole moment of solvent molecules in the system. Uses partial charges for <solvent> and calculates
         and includes pseudoatoms if applicable. """
 
     # Prepare charges for selected solute
     if   solvent.lower() in ["spce"]:
-        O_chg, H_chg, M_chg, resnames = -0.83400, 0.41700, None,     ["HOH", "SPC"]
+        O_chg, H_chg, M_chg, M_d, resnames = -0.83400, 0.41700, None,     None,   ["HOH", "SPC"]
     elif solvent.lower() in ["tip3p", "tips3p"]:
-        O_chg, H_chg, M_chg, resnames = -0.84760, 0.42380, None,     ["HOH", "T3P"]
+        O_chg, H_chg, M_chg, M_d, resnames = -0.84760, 0.42380, None,     None,   ["HOH", "T3P"]
     elif solvent.lower() in ["tip4p"]:
-        O_chg, H_chg, M_chg, resnames =  0.0,     0.52000, -1.04000, ["HOH", "T4P"]
+        O_chg, H_chg, M_chg, M_d, resnames =  0.0,     0.52000, -1.04000, 0.15,   ["HOH", "T4P"]
     elif solvent.lower() in ["tip4p2005"]:
-        O_chg, H_chg, M_chg, resnames =  0.0,     0.55640, -1.11280, ["HOH", "T4P5"]
+        O_chg, H_chg, M_chg, M_d, resnames =  0.0,     0.55640, -1.11280, 0.125,  ["HOH", "T4P5"]
     elif solvent.lower() in ["tip4pew"]:
-        O_chg, H_chg, M_chg, resnames =  0.0,     0.52422, -1.04844, ["HOH", "T4PE"]
+        O_chg, H_chg, M_chg, M_d, resnames =  0.0,     0.52422, -1.04844, 0.1546, ["HOH", "T4PE"]
 
     # Load trajectory and partial charges
     trj      = mdtraj.load(segment.trajectory, top = segment.topology)
@@ -60,7 +60,7 @@ def dipole(segment, destination, solvent, verbose = False, **kwargs):
         dipole[i]      = np.sum(frame[chg_indexes] * charges, axis = 0)
         if M_chg is not None:                                                   # Calculate pseudoatom contribution
             pseudo     = ((frame[all_indexes[:,1]] + frame[all_indexes[:,2]]) / 2.0) - frame[all_indexes[:,0]]
-            mag        = 0.15 / np.sqrt(np.sum(pseudo*pseudo, axis = 1))
+            mag        = M_d / np.sqrt(np.sum(pseudo*pseudo, axis = 1))
             pseudo    *= np.column_stack((mag, mag, mag))
             pseudo    += frame[all_indexes[:,0],:]
             dipole[i] += np.sum(pseudo * M_chg, axis = 0)
@@ -71,6 +71,7 @@ def dipole(segment, destination, solvent, verbose = False, **kwargs):
     attrs = {"method": "mdtraj", "units": "e A", "number of waters": all_indexes.shape[0]}
     return [(segment + "/" + destination, dipole),
             (segment + "/" + destination, attrs)]
+
 def _check_dipole(hdf5_file, segment, force = False, **kwargs):
     if not (segment.topology   and os.path.isfile(segment.topology)
     and     segment.trajectory and os.path.isfile(segment.trajectory)):

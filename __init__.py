@@ -24,6 +24,7 @@ def analyze_primary(hdf5_filename, path, analyses, segment_lister = "MD_toolkit.
         2) Builds task list based on requested <analyses>, data present in <hdf5_filename>, and listed segments
         3) Distributes tasks across <n_cores> and writes results to <hdf5_filename> """
     if verbose: print("Analyzing trajectory at {0}".format(path.replace("//","/")))
+    if verbose: print("Using HDF5 file at {0}".format(hdf5_filename.replace("//","/")))
 
     for module in set(["MD_toolkit.primary." + m[:m.rfind(".")] for m, _ in analyses if m.rfind(".")!=-1]):
         import_module(module)
