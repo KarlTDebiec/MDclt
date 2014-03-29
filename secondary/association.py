@@ -1,8 +1,10 @@
 #!/usr/bin/python
-desc = """MD_toolkit.secondary.association.py
-    Functions for secondary analysis of molecular association
-    Written by Karl Debiec on 12-08-15
-    Last updated by Karl Debiec on 13-11-15"""
+# MD_toolkit.secondary.association.py
+#    Written by Karl Debiec on 12-08-15
+#    Last updated by Karl Debiec on 14-03-28
+"""
+Functions for secondary analysis of molecular association
+"""
 ########################################### MODULES, SETTINGS, AND DEFAULTS ############################################
 import os, sys, time, types, warnings
 import numpy as np
@@ -37,12 +39,14 @@ def rate(hdf5_file,
         n_molecule_2,                                       # Number of molecules of type 2
         destination,                                        # Analysis output destination within hdf5 file
         verbose = False, n_cores = 1, **kwargs):
-    """ Calculates Ka, kon, and koff for association of <n_molecule_1> molecules of type 1 and <n_molecule_2> molecules
-        of type 2 in a box of <volume>. The bound state is defined as <distance> below <bound_cutoff> and the unbound
-        state is defined as <distance> above <unbound_cutoff>. In between the cutoffs, the molecule is assigned to
-        whichever state it most recently occupied.
-        Standard error is estimated using the blocking method of Flyvbjerg, H., and Petersen, H. G. Error Estimates on
-        Averages of Correlated Data. J Phys Chem. 1989. 91. 461-466. """
+    """
+    Calculates Ka, kon, and koff for association of <n_molecule_1> molecules of type 1 and <n_molecule_2> molecules
+    of type 2 in a box of <volume>. The bound state is defined as <distance> below <bound_cutoff> and the unbound
+    state is defined as <distance> above <unbound_cutoff>. In between the cutoffs, the molecule is assigned to
+    whichever state it most recently occupied.
+    Standard error is estimated using the blocking method of Flyvbjerg, H., and Petersen, H. G. Error Estimates on
+    Averages of Correlated Data. J Phys Chem. 1989. 91. 461-466.
+    """
 
     # Prepare timestep and concentrations
     dt              = time[1] - time[0]
@@ -242,15 +246,25 @@ def exchange(hdf5_file,
         n_molecule_1,                                       # Number of molecules of type 1
         n_molecule_2,                                       # Number of molecules of type 2
         destination,                                        # Analysis output destination within hdf5 file
-        verbose = False, n_cores = 1, **kwargs):
-    """ Analyzes pairwise association of <n_molecule_1> molecules of type 1 and <n_molecule_2> molecules
-        of type 2 in a box of <volume>. The bound state is defined as <distance> below <bound_cutoff> and the unbound
-        state is defined as <distance> above <unbound_cutoff>. In between the cutoffs, the molecule is assigned to
-        whichever state it most recently occupied.
-        Standard error is estimated using the blocking method of Flyvbjerg, H., and Petersen, H. G. Error Estimates on
-        Averages of Correlated Data. J Phys Chem. 1989. 91. 461-466. """
+        verbose = False, debug = False, n_cores = 1, **kwargs):
+    """
+    Analyzes pairwise association between <n_molecule_1> molecules of type 1 and <n_molecule_2> molecules of type 2 in a
+    box of <volume>. The bound state is defined as <source> distance metric below <bound_cutoff> and the unbound state
+    is defined as <distance> above <unbound_cutoff>. In between the cutoffs, the molecule is assigned to whichever state
+    it most recently occupied. Calculates the kon and koff of each individual pairs, as well as averages over all pairs.
+    Additionally calculates the KA values for the association of molecule_1 with molecule_2, as well as those for
+    association of molecule_1 with multiple molecule_2. Does not current account for association of multiple molecule_1
+    with a single molecule 2. 
+    Standard errors of the probability of the unbound and each bound states are estimated using the blocking method of
+    Flyvbjerg, H., and Petersen, H. G. Error Estimates on Averages of Correlated Data. J Phys Chem. 1989. 91. 461-466.
+    These errors are propogated into the concentrations of each state, and into the calculated association constants.
+    """
 
     def load_distance(self, path, j, k, n_frames, index = 0):
+        """
+        HDF5 loader function used to load distance metric for atoms <j> and <k> from <path>
+        Requires total <n_frames> 
+        """
         data                   = np.zeros(n_frames, np.float32)
         i                      = 0
         for segment in self._segments():
@@ -266,16 +280,18 @@ def exchange(hdf5_file,
         return data
 
     # Prepare timestep and concentrations
-    dt           = time[1] - time[0]
+    dt           = np.mean(time[1:] - time[:-1], dtype = np.float64)            # Allows small number of dropped frames
     n_frames     = time.size
     C_1          = _concentration(1,            volume)
     C_mol1_total = _concentration(n_molecule_1, volume)
     C_mol2_total = _concentration(n_molecule_2, volume)
-    count        = np.zeros((n_frames, n_molecule_1), np.int)
-    events       = []
-    data         = np.zeros((n_molecule_1, n_molecule_2), 
-                   [("Pbound",    "f4"), ("Pbound se", "f4"), ("fpt on",     "f4"),
-                    ("fpt on se", "f4"), ("fpt off",   "f4"), ("fpt off se", "f4")])
+    count        = np.zeros((n_frames, n_molecule_1), np.int)                   # Number of mol_2 bound to each mol_1
+    events       = []                                                           # List of binding events
+    stat_dtype   = [("Pbound",       "f4"), ("Pbound se",       "f4"), ("mean fpt on", "f4"), ("mean fpt on se", "f4"),
+                    ("mean fpt off", "f4"), ("mean fpt off se", "f4"), ("kon",         "f4"), ("kon se",         "f4"),
+                    ("koff",         "f4"), ("koff se",         "f4")]
+    pair_stats   = np.zeros((n_molecule_1, n_molecule_2), stat_dtype)           # Binding statistics for each pair
+    total_stats  = np.zeros(1, stat_dtype)                                      # Averages over all pairs
 
     for j in range(n_molecule_1):
         for k in range(n_molecule_2):
@@ -292,7 +308,7 @@ def exchange(hdf5_file,
             enter_bound     = np.where(trans_bound   == 1)[0] + 1
             enter_unbound   = np.where(trans_unbound == 1)[0] + 1
             try:    enter   = enter_bound[0]                                # Start at first entrance of bound state
-            except: continue                                                # Molecule never enters bound state
+            except: continue                                                # Pair never enters bound state
             while True:
                 try:                                                        # Look for next entrance of unbound state
                     exit    = enter_unbound[enter_unbound > enter][0]       #   Next entrance found
@@ -305,18 +321,15 @@ def exchange(hdf5_file,
                 except:                                                     # Trajectory ends with pair in unbound state
                     break                                                   #   Exit
 
-            # Calculate Pbound and its evolution
-            Pbound  = np.array(bound.copy(), np.float)
-            for i in xrange(1, time.size):
-                Pbound[i] += Pbound[i-1]
-            Pbound /= np.arange(1, time.size + 1, 1)
+            # Calculate Pbound
+            Pbound  = np.sum(bound, dtype = np.float64) / float(bound.size)
 
             # Calculate standard error of Pbound using block averaging
             sizes, ses, se_sds      = block_average(bound)
             try:    a, Pbound_se, c, d, fit = fit_curve(x = sizes, y = ses, sigma = se_sds, fit_func = "sigmoid")
             except:    Pbound_se            = np.nan
 
-            # Calculate mean first passage time
+            # Calculate mean first passage time and tabule binding events
             trans_bound     = bound[:-1] - bound[1:]
             enter_bound     = np.where(trans_bound  == -1)[0] + 1
             enter_unbound   = np.where(trans_bound  ==  1)[0] + 1
@@ -340,50 +353,142 @@ def exchange(hdf5_file,
                     fpt_on   = enter_bound       - enter_unbound                                    #   ended bound
                     fpt_off  = enter_unbound[1:] - enter_bound[:-1]
                     events  += [(j, k, bind, unbind, unbind - bind)
-                                   for bind, unbind in np.column_stack((enter_bound[:-1] * dt, enter_unbound[1:] * dt))] 
+                                   for bind, unbind in np.column_stack((enter_bound[:-1] * dt, enter_unbound[1:] * dt))]
+
+                # Convert mean first passage time into rates
+                mean_fpt_on     = np.mean(fpt_on)
+                mean_fpt_off    = np.mean(fpt_off)
+                mean_fpt_on_se  = np.std(fpt_on)  / np.sqrt(fpt_on.size)
+                mean_fpt_off_se = np.std(fpt_off) / np.sqrt(fpt_off.size)
+                kon_sim         = 1 / mean_fpt_on
+                koff_sim        = 1 / mean_fpt_off
+                kon_sim_se      = kon_sim  * (mean_fpt_on_se  / mean_fpt_on)
+                koff_sim_se     = koff_sim * (mean_fpt_off_se / mean_fpt_off)
+                kon             = kon_sim  / (C_1 * C_1)
+                koff            = koff_sim /  C_1
+                kon_se          = kon      * (kon_sim_se      / kon_sim)
+                koff_se         = koff     * (koff_sim_se     / koff_sim) 
+
+            # Pair never switches between bound and unbound states
             else:
-                fpt_on  = np.array([])
-                fpt_off = np.array([])
+                mean_fpt_on,  mean_fpt_on_se    = np.nan, np.nan
+                mean_fpt_off, mean_fpt_off_se   = np.nan, np.nan
+                kon,          kon_se            = np.nan, np.nan
+                koff,         koff_se           = np.nan, np.nan
+
+            # Cleanup large unneeded numpy arrays (may or may not make a difference)
+            del(distance, unbound, sizes, trans_bound, trans_unbound, enter_bound, enter_unbound, fpt_on, fpt_off)
 
             # Organize data
-            count[:, j]            += bound
-            data[j,k]["Pbound"]     = Pbound[-1]
-            data[j,k]["Pbound se"]  = Pbound_se
-            data[j,k]["fpt on"]     = np.mean(fpt_on)                         if fpt_on.size  != 0 else np.nan
-            data[j,k]["fpt on se"]  = np.std(fpt_on) / np.sqrt(fpt_on.size)   if fpt_on.size  != 0 else np.nan
-            data[j,k]["fpt off"]    = np.mean(fpt_off)                        if fpt_off.size != 0 else np.nan
-            data[j,k]["fpt off se"] = np.std(fpt_off) / np.sqrt(fpt_off.size) if fpt_off.size != 0 else np.nan
+            count[:, j]                                                        += bound
+            pair_stats[j,k]["Pbound"],       pair_stats[j,k]["Pbound se"]       = Pbound,       Pbound_se
+            pair_stats[j,k]["mean fpt on"],  pair_stats[j,k]["mean fpt on se"]  = mean_fpt_on,  mean_fpt_on_se
+            pair_stats[j,k]["mean fpt off"], pair_stats[j,k]["mean fpt off se"] = mean_fpt_off, mean_fpt_off_se
+            pair_stats[j,k]["kon"],          pair_stats[j,k]["kon se"]          = kon,          kon_se
+            pair_stats[j,k]["koff"],         pair_stats[j,k]["koff se"]         = koff,         koff_se
+            if debug:
+                print "Molecule 1: {0:03d}    Molecule 2: {1:03d}    Pbound (se): {2:7.5f} ({3:7.5f})".format(j, k,
+                      float(pair_stats[j, k]["Pbound"]), float(pair_stats[j, k]["Pbound se"]))
+
+    # Calculate overall averages and organize data
+    for key in ["Pbound", "mean fpt on", "mean fpt off", "kon", "koff"]:
+        total_stats[key]         = np.mean(pair_stats[key])
+        total_stats[key + " se"] = np.sqrt(np.sum(pair_stats[key + " se"] ** 2.0)) / pair_stats.size
+    events                       = np.array(events, [("index 1", "i4"), ("index 2",  "i4"), ("start", "f4"),
+                                                     ("end",     "f4"), ("duration", "f4")])
+
+    # Calculate Pstate of different bound states
+    n_states    = np.max(count) + 1
+    Pstate      = np.zeros(n_states)
+    Pstate_se   = np.zeros(n_states)
+    for i in range(0, n_states):                                                # i = number of mol 2 bound to mol 1
+        Pstate[i]       = float(count[count == i].size) / float(count.size)     # Accounts for presence of mult. mol 1
+        mol1_in_state_i = np.zeros(count.shape, np.int8)                        # Binary over trajectory
+        mol1_in_state_i[count == i] = 1
+        total_mol1_in_state_i       = np.sum(mol1_in_state_i, axis = 1, dtype = np.float64)
+
+        # Calculate standard error of Pstate using block averaging
+        sizes, ses, se_sds                  = block_average(total_mol1_in_state_i / n_molecule_1)
+        try:    a, Pstate_se[i], c, d, fit  = fit_curve(x = sizes, y = ses, sigma = se_sds, fit_func = "sigmoid")
+        except:    Pstate_se[i]             = np.nan
+    if debug:
+        for i in range(Pstate.size): print "P state {0:02d}: {1:7.5f} ({2:7.5f})".format(i, Pstate[i], Pstate_se[i])
+        print "Sum       : {0:7.5f}".format(np.sum(Pstate))
+
+    # Calculate concentrations
+    C_mol1_free     = C_mol1_total * Pstate[0]
+    C_mol1_free_se  = C_mol1_free  * (Pstate_se[0] / Pstate[0])
+    C_mol2_free     = C_mol2_total - C_mol1_total * np.sum([i * P for i, P in enumerate(Pstate[1:], 1)])
+    C_mol2_free_se  = C_mol1_total * np.sqrt(np.sum([(i * P_se) ** 2 for i, P_se in enumerate(Pstate_se[1:], 1)]))
+    C_bound         = C_mol1_total * Pstate[1:]
+    C_bound_se      = C_bound      * (Pstate_se[1:] / Pstate[1:])
+    np.set_printoptions(precision = 5, suppress = True, linewidth = 120)
+    if debug:
+        print "[mol1 total]:      {0:7.5f}".format(C_mol1_total)
+        print "[mol2 total]:      {0:7.5f}".format(C_mol2_total)
+        print "[mol1 free] (se):  {0:7.5f} ({1:7.5f})".format(C_mol1_free, C_mol1_free_se)
+        print "[mol2 free] (se):  {0:7.5f} ({1:7.5f})".format(C_mol2_free, C_mol2_free_se)
+        for i in range(C_bound.size):
+            print "[complex {0:02d}] (se): {1:7.5f} ({2:7.5f})".format(i + 1, C_bound[i],     C_bound_se[i])
+        print "Sum [mol1]:        {0:7.5f}".format(C_mol1_free + np.sum(C_bound))
+        print "Sum [mol2]:        {0:7.5f}".format(C_mol2_free + np.sum([i * C for i, C in enumerate(C_bound, 1)]))
+
+    # Calculate KAs
+    KA              = np.zeros(n_states - 1)
+    KA_se           = np.zeros(n_states - 1)
+    KA[0]           = C_bound[0] / (C_mol1_free * C_mol2_free)
+    KA_se[0]        = KA[0] * np.sqrt((C_bound_se[0] / C_bound[0]) ** 2 + (C_mol1_free_se  / C_mol1_free)  ** 2
+                                      + (C_mol2_free_se / C_mol2_free) ** 2)
+    for i in range(1, n_states - 1):
+        KA[i]       = C_bound[i] / (C_bound[i-1] * C_mol2_free)
+        KA_se[i]    = KA[i] * np.sqrt((C_bound_se[i] / C_bound[i]) ** 2 + (C_bound_se[i-1] / C_bound[i-1]) ** 2
+                                      + (C_mol2_free_se / C_mol2_free) ** 2)
+    KA_list       = [Pstate[0],                             Pstate_se[0]]
+    KA_dtype      = [("P unbound", "f4"),                   ("P unbound se", "f4")]
+    for i in range(1, Pstate.size):
+        KA_list  += [Pstate[i],                             Pstate_se[i]]
+        KA_dtype += [("P {0} bound".format(i), "f4"),       ("P {0} bound se".format(i), "f4")]
+    KA_list      += [C_mol1_free,                           C_mol1_free_se]
+    KA_dtype     += [("[mol1 free]", "f4"),                 ("[mol1 free] se", "f4")]
+    KA_list      += [C_mol2_free,                           C_mol2_free_se]
+    KA_dtype     += [("[mol2 free]", "f4"),                 ("[mol2 free] se", "f4")]
+    for i in range(C_bound.size):
+        KA_list  += [C_bound[i],                            C_bound_se[i]]
+        KA_dtype += [("[complex {0}]".format(i + 1), "f4"), ("[complex {0}] se".format(i + 1), "f4")]
+    KA_list      += [KA[0],                                 KA_se[0]]
+    KA_dtype     += [("KA 1", "f4"),                        ("KA 1 se", "f4")]
+    for i in range(1, KA.size):
+        KA_list  += [KA[i],                                 KA_se[i]]
+        KA_dtype += [("KA {0}".format(i + 1), "f4"),        ("KA {0} se".format(i + 1), "f4")]
+    KA_array      = np.array([tuple(KA_list)], KA_dtype)
+    if debug:
+        for i in range(KA.size): print "KA {0:02d}: {1:7.5f} ({2:7.5f})".format(i + 1, KA[i], KA_se[i])
 
     # Organize and return data
-    count_attrs  = {"histogram": " ".join([str(count[count == i].size) for i in range (0, np.max(count) + 1)])}
-    events       = np.array(events, [("index 1", "i4"), ("index 2", "i4"), ("start", "f4"), ("end", "f4"),
-                                             ("duration", "f4")])
-    events_attrs = {"duration_mean":   np.mean(events["duration"]),
-                    "duration_std":    np.std(events["duration"]),
-                    "N_events":        events.size}
-    Pbound_attrs = {"Pbound_mean":     np.mean(np.ma.MaskedArray(data["Pbound"],  np.isnan(data["Pbound"]))),
-                    "Pbound_std":      np.std(np.ma.MaskedArray(data["Pbound"],   np.isnan(data["Pbound"]))),
-                    "fpt_on_mean":     np.mean(np.ma.MaskedArray(data["fpt on"],  np.isnan(data["fpt on"]))),
-                    "fpt_on_std":      np.std(np.ma.MaskedArray(data["fpt on"],   np.isnan(data["fpt on"]))),
-                    "fpt_off_mean":    np.mean(np.ma.MaskedArray(data["fpt off"], np.isnan(data["fpt off"]))),
-                    "fpt_off_std":     np.std(np.ma.MaskedArray(data["fpt off"],  np.isnan(data["fpt off"])))}
-    attrs        = {"n_molecule_1":    n_molecule_1,        "n_molecule_2":    n_molecule_2,
-                    "concentration_1": C_mol1_total,        "concentration_2": C_mol2_total,
-                    "bound_cutoff":    float(bound_cutoff), "unbound_cutoff":  float(unbound_cutoff),
-                    "volume":          volume * 1e27,
-                    "time":            "{0:.3f} {1:.3f}".format(float(time[0]), float(time[-1]))}
-    if verbose:    _print_exchange(destination, attrs, Pbound_attrs, count_attrs, events_attrs)
-    return  [(destination + "/pairs/count",  count),
-             (destination + "/pairs/count",  count_attrs),
-             (destination + "/pairs/events", events),
-             (destination + "/pairs/events", events_attrs),
-             (destination + "/pairs/Pbound", data),
-             (destination + "/pairs/Pbound", Pbound_attrs),
-             (destination + "/pairs",        attrs)]
+    pair_stat_attrs     = {"fpt units":      "ps", "kon units": "M-2 ps-1", "koff units": "M-1 ps-1"}
+    total_stat_attrs    = {"fpt units":      "ps", "kon units": "M-2 ps-1", "koff units": "M-1 ps-1"}
+    events_attrs        = {"duration units": "ps"}
+    KA_attrs            = {"KA units":       "M-1"}
+    attrs               = {"N molecule 1":    n_molecule_1,        "N molecule 2":    n_molecule_2,
+                           "[molecule 1]":    C_mol1_total,        "[molecule 2]":    C_mol2_total,
+                           "bound cutoff":    float(bound_cutoff), "unbound cutoff":  float(unbound_cutoff),
+                           "volume":          volume * 1e27,
+                           "time":            "{0:.3f} {1:.3f}".format(float(time[0]), float(time[-1]))}
+    if verbose:    _print_exchange(destination, total_stats, events, KA_array, attrs)
+    return  [(destination + "/pairs/pair_stats",   pair_stats),
+             (destination + "/pairs/pair_stats",   pair_stat_attrs),
+             (destination + "/pairs/total_stats",  total_stats),
+             (destination + "/pairs/total_stats",  total_stat_attrs),
+             (destination + "/pairs/events",       events),
+             (destination + "/pairs/KA",           KA_array),
+             (destination + "/pairs/KA",           KA_attrs),
+             (destination + "/pairs",              attrs)]
 
 def _check_exchange(hdf5_file, force = False, **kwargs):
-    """ Determines whether or not to run 'association.exchange' based on settings and data present in hdf5 file, and loads
-        necessary primary data. """
+    """
+    Determines whether or not to run 'association.exchange' based on settings and data present in hdf5 file, and loads
+    necessary primary data.
+    """
 
     # Parse kwargs and set defaults
     source                                    = kwargs.pop("source",        "*/association_mindist")
@@ -392,11 +497,12 @@ def _check_exchange(hdf5_file, force = False, **kwargs):
     kwargs["bound_cutoff"]   = bound_cutoff   = kwargs.get("bound_cutoff",   3.5)
     kwargs["unbound_cutoff"] = unbound_cutoff = kwargs.get("unbound_cutoff", 3.5)
     kwargs["destination"]    = destination    = kwargs.get("destination",    "/association/mindist")
-    kwargs["volume"]         = volume         = kwargs.get("volume",         None)                  # MAY NOT BE USED
+    kwargs["volume"]         = volume         = kwargs.get("volume",         None)
 
     # If analysis has not been run previously, run analysis
-    expected = [destination + "/pairs",       destination + "/pairs/events",
-                destination + "/pairs/count", destination + "/pairs/Pbound"]
+    expected = [destination + "/pairs",             destination + "/pairs/pair_stats",
+                destination + "/pairs/total_stats", destination + "/pairs/events",
+                destination + "/pairs/KA"]
     if     (force
     or not (expected in hdf5_file)):
         log                     = hdf5_file.load("*/log", type = "table")
@@ -414,8 +520,8 @@ def _check_exchange(hdf5_file, force = False, **kwargs):
     log                     = hdf5_file.load("*/log", type = "table")
     kwargs["index"] = index = ignore_index(log["time"], ignore)
     kwargs["time"]          = log["time"][index:]
-    if (attrs["bound_cutoff"]   != bound_cutoff
-    or (attrs["unbound_cutoff"] != unbound_cutoff)
+    if (attrs["bound cutoff"]   != bound_cutoff
+    or (attrs["unbound cutoff"] != unbound_cutoff)
     or (attrs["time"]           != "{0:.3f} {1:.3f}".format(float(kwargs["time"][0]), float(kwargs["time"][-1])))):
         if volume is None:
             kwargs["volume"]     = np.mean(log["volume"]) * 1e-27                                   # A^3 -> L (dm^3)
@@ -426,103 +532,38 @@ def _check_exchange(hdf5_file, force = False, **kwargs):
 
     # If analysis has been run previously with the same settings, output data and return
     if kwargs.get("verbose", False):
-        attrs        = hdf5_file.attrs(destination + "/pairs")
-        Pbound_attrs = hdf5_file.attrs(destination + "/pairs/Pbound")
-        count_attrs  = hdf5_file.attrs(destination + "/pairs/count")
-        events_attrs = hdf5_file.attrs(destination + "/pairs/events")
-        _print_exchange(destination, attrs, Pbound_attrs, count_attrs, events_attrs)
-        
+        stats        = hdf5_file.load(destination + "/pairs/total_stats")
+        events       = hdf5_file.load(destination + "/pairs/events")
+        KA           = hdf5_file.load(destination + "/pairs/KA")
+        _print_exchange(destination, stats, events, KA, attrs)
     return False
 
-def _print_exchange(destination, attrs, Pbound_attrs, count_attrs, events_attrs):
+def _print_exchange(destination, stats, events, KA, attrs):
+    stats  = {key: float(stats[0][key]) for key in stats.dtype.names}
+    KA     = {key: float(KA[0][key])    for key in KA.dtype.names}
     print "TIME     {0:.3f} ns - {1:.3f} ns".format(*map(float, attrs["time"].split()))
     print "DURATION {0:.3f} ns".format(float(attrs["time"].split()[1]) - float(attrs["time"].split()[0]))
     print "DATASET  {0}".format(destination)
-    print "BOUND < {0:3.1f} A UNBOUND > {1:3.1f} A".format(attrs["bound_cutoff"],         attrs["unbound_cutoff"])
+    print "BOUND < {0:4.2f} A UNBOUND > {1:4.2f} A".format(attrs["bound cutoff"], attrs["unbound cutoff"])
     print "VOLUME       {0:d} A^3".format(int(attrs["volume"]))
-    print "[MOLECULE 1] {0:4.3f} M".format(float(attrs["concentration_1"]))
-    print "[MOLECULE 2] {0:4.3f} M".format(float(attrs["concentration_2"]))
-    print "Pbound   (std)  {0:>7.3f} ({1:>7.3f})".format(Pbound_attrs["Pbound_mean"],      Pbound_attrs["Pbound_std"])
-    print "Duration (std)  {0:>7.3f} ({1:>7.3f}) ns".format(events_attrs["duration_mean"], events_attrs["duration_std"])
-    print "fpt on   (std)  {0:>7.3f} ({1:>7.3f}) ns".format(Pbound_attrs["fpt_on_mean"],   Pbound_attrs["fpt_on_std"])
-    print "fpt off  (std)  {0:>7.3f} ({1:>7.3f}) ns".format(Pbound_attrs["fpt_off_mean"],  Pbound_attrs["fpt_off_std"])
-    print "N Events        {0:>7d}".format(events_attrs["N_events"])
-    print "Number (2) bound to (1)  Probability"
-    for i, c in enumerate(count_attrs["histogram"].split()):
-        print "  {0}                        {1:>7.5f}".format(i,
-              float(c) / np.sum(map(float,count_attrs["histogram"].split())))
-##################################################### DEPRECIATED ######################################################
-"""
-def _load_association_distance_histogram(self, path, bins, **kwargs):
-    segments            = self._segments()
-    data                = None
-    for segment in segments:
-        seg_data        = self[segment + "/" + path[2:]]
-        sorted_seg_data = np.zeros(seg_data.shape, np.float32)
-        if data is None:
-            data        = np.zeros((seg_data.shape[2], bins.size - 1), np.int32)
-        for t in xrange(seg_data.shape[0]):
-            for i in xrange(seg_data.shape[1]):
-                sorted_seg_data[t,i] = seg_data[t, i, seg_data[t,i].argsort()]
-        for j in xrange(sorted_seg_data.shape[2]):
-            hist, _     = np.histogram(sorted_seg_data[:,:,j], bins)
-            data[j]    += hist
-    return data
-
-def distance_histogram(hdf5_file,
-        pcoord,                                             # Progress coordinate name
-        bins,                                               # Bins
-        source,                                             # Progress coordinate key within hdf5_file.data
-        destination,                                        # Analysis output destination within HDF5 file
-        verbose     = False, n_cores = 1, **kwargs):
-    duration    = hdf5_file.data["*/log"]["time"][-1]
-    count       = hdf5_file.data[source]
-
-    dtype       = eval("np.dtype([('lower bound', 'f4'), ('upper bound', 'f4')" +
-                       "".join([", ('{0}', 'i4')".format(i) for i in xrange(count.shape[0])]) + "])")
-    data        = np.array([tuple(frame) for frame in zip(bins[:-1], bins[1:], *count)], dtype)
-    attrs       = {"lower bound units": "A", "upper bound units": "A", "time": duration}
-    if verbose: _print_distance_histogram(pcoord, data, attrs)
-    return  [(destination, data),
-             (destination, attrs)]
-def _check_distance_histogram(hdf5_file, force = False, **kwargs):
-    pcoord      = kwargs.get("pcoord")
-    bins        = kwargs.get("bins")
-    source      = kwargs.pop("source",      "*/association_" + pcoord)
-    destination = kwargs.get("destination",   "association/" + pcoord + "/distance_histogram")
-    verbose     = kwargs.get("verbose",     False)
-
-    duration    = hdf5_file.load("*/log", type = "table")["time"][-1]
-    kwargs["destination"]   = destination
-
-    if     (force                                                               # Run analysis if forced or analysis has
-    or not (destination in hdf5_file)):                                         #   not previously been run
-        kwargs["source"]    = "association.distance_histogram:{0:f}".format(time.time())
-        hdf5_file.load(source, destination = kwargs["source"], loader = _load_association_distance_histogram,
-          bins = bins)
-        return [(distance_histogram, kwargs)]
-
-    data    = hdf5_file[destination]
-    attrs   = hdf5_file.attrs(destination)
-    if ((data["lower bound"].size + 1 != bins.size)                             # Run analysis if it has been run
-    or  (np.any(data["lower bound"]   != np.array(bins[:-1], np.float32)))      #   previously, but with different
-    or  (np.any(data["upper bound"]   != np.array(bins[1:],  np.float32)))      #   settings or trajectory duration
-    or  (attrs["time"]                != duration)):
-        kwargs["source"]    = "association.distance_histogram:{0:f}".format(time.time())
-        hdf5_file.load(source, destination = kwargs["source"], loader = _load_association_distance_histogram,
-          bins = bins)
-        return [(distance_histogram, kwargs)]
-    if verbose: _print_distance_histogram(pcoord, data, attrs)                  # Do not run analysis
-    return False
-def _print_distance_histogram(pcoord, data, attrs):
-    print "DURATION {0:5d} ns PROGRESS COORDINATE {1} ".format(int(attrs["time"]),   pcoord.upper())
-    print "  LOWER  UPPER{0:>7d}{1:>7d}{2:>7d}{3:>7d}{4:>7d}{5:>7d}{6:>7d}{7:>7d}".format(*range(9)),
-    print "{0:>7d}{1:>7d}{2:>7d}{3:>7d}{4:>7d}{5:>7d}{6:>7d}".format(*range(8, 15, 1))
-    for line in data:
-        print "{0:>7.3f}{1:>7.3f}{2:>7d}{3:>7d}".format(float(line[0]), float(line[1]), int(line[2]), int(line[3])),
-        print "{0:>7d}{1:>7d}{2:>7d}{3:>7d}".format(int(line[4]),  int(line[5]),  int(line[6]),  int(line[7])),
-        print "{0:>7d}{1:>7d}{2:>7d}{3:>7d}".format(int(line[8]),  int(line[9]),  int(line[10]), int(line[11])),
-        print "{0:>7d}{1:>7d}{2:>7d}{3:>7d}".format(int(line[12]), int(line[13]), int(line[14]), int(line[15]))
-"""
+    print "[MOLECULE 1] {0:4.3f} M".format(float(attrs["[molecule 1]"]))
+    print "[MOLECULE 2] {0:4.3f} M".format(float(attrs["[molecule 2]"]))
+    print "PAIRS"
+    print "    mean P bound (se)  {0:>7.3f} ({1:>7.3f})".format(         stats["Pbound"],       stats["Pbound se"])
+    print "    mean fpt on  (se)  {0:>7.3f} ({1:>7.3f}) ps".format(      stats["mean fpt on"],  stats["mean fpt on se"])
+    print "    mean fpt off (se)  {0:>7.3f} ({1:>7.3f}) ps".format(      stats["mean fpt off"], stats["mean fpt off se"])
+    print "    mean kon     (se)  {0:>7.3f} ({1:>7.3f}) M-2 ps-1".format(stats["kon"],          stats["kon se"])
+    print "    mean koff    (se)  {0:>7.3f} ({1:>7.3f}) M-2 ps-1".format( stats["koff"],         stats["koff se"])
+    print "    N events           {0:>7d}".format(events.size)
+    print "OVERALL"
+    print "    P unbound    (se)  {0:>7.5f} ({1:>7.5f})".format(         KA["P unbound"],       KA["P unbound se"])
+    for i, key in enumerate(sorted([k for k in KA if k.endswith(" bound")]), 1):
+        print "    P {0:02d} bound   (se)  {1:>7.5f} ({2:>7.5f})".format(i,KA[key],               KA[key + " se"])
+    print "    [mol1 free]  (se)  {0:>7.5f} ({1:>7.5f})".format(         KA["[mol1 free]"],     KA["[mol1 free] se"])
+    print "    [mol2 free]  (se)  {0:>7.5f} ({1:>7.5f})".format(         KA["[mol2 free]"],     KA["[mol2 free] se"])
+    for i, key in enumerate(sorted([k for k in KA if k.startswith("[complex ") and not k.endswith("se")]), 1):
+        print "    {0}  (se)  {1:>7.5f} ({2:>7.5f})".format(key,         KA[key],     KA[key + " se"])
+    for i, key in enumerate(sorted([k for k in KA if k.startswith("KA ") and not k.endswith("se")]), 1):
+        print "    {0}         (se)  {1:>7.5f} ({2:>7.5f})".format(key,         KA[key],     KA[key + " se"])
 
 
