@@ -327,9 +327,9 @@ def exchange(hdf5_file,
             # Calculate standard error of Pbound using block averaging
             sizes, ses, se_sds      = block_average(bound)
             try:    a, Pbound_se, c, d, fit = fit_curve(x = sizes, y = ses, sigma = se_sds, fit_func = "sigmoid")
-            except:    Pbound_se            = np.nan
+            except:    Pbound_se            = Pbound
 
-            # Calculate mean first passage time and tabule binding events
+            # Calculate mean first passage time and tabulate binding events
             trans_bound     = bound[:-1] - bound[1:]
             enter_bound     = np.where(trans_bound  == -1)[0] + 1
             enter_unbound   = np.where(trans_bound  ==  1)[0] + 1
@@ -392,8 +392,10 @@ def exchange(hdf5_file,
 
     # Calculate overall averages and organize data
     for key in ["Pbound", "mean fpt on", "mean fpt off", "kon", "koff"]:
-        total_stats[key]         = np.mean(pair_stats[key])
-        total_stats[key + " se"] = np.sqrt(np.sum(pair_stats[key + " se"] ** 2.0)) / pair_stats.size
+        pair_stat_masked         = np.ma.MaskedArray(pair_stats[key],         np.isnan(pair_stats[key]))
+        pair_stat_masked_se      = np.ma.MaskedArray(pair_stats[key + " se"], np.isnan(pair_stats[key + " se"]))
+        total_stats[key]         = np.mean(pair_stat_masked)
+        total_stats[key + " se"] = np.sqrt(np.sum(pair_stat_masked_se ** 2.0)) / pair_stat_masked.size
     events                       = np.array(events, [("index 1", "i4"), ("index 2",  "i4"), ("start", "f4"),
                                                      ("end",     "f4"), ("duration", "f4")])
 
@@ -410,7 +412,7 @@ def exchange(hdf5_file,
         # Calculate standard error of Pstate using block averaging
         sizes, ses, se_sds                  = block_average(total_mol1_in_state_i / n_molecule_1)
         try:    a, Pstate_se[i], c, d, fit  = fit_curve(x = sizes, y = ses, sigma = se_sds, fit_func = "sigmoid")
-        except:    Pstate_se[i]             = np.nan
+        except:    Pstate_se[i]             = Pstate[i]
     if debug:
         for i in range(Pstate.size): print "P state {0:02d}: {1:7.5f} ({2:7.5f})".format(i, Pstate[i], Pstate_se[i])
         print "Sum       : {0:7.5f}".format(np.sum(Pstate))
