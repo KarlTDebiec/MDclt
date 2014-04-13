@@ -1,116 +1,111 @@
 #!/usr/bin/python
-desc = """MD_toolkit.secondary.diffusion.translation.__init__.py
-    Functions for secondary analysis of diffusion
-    Written by Karl Debiec on 13-02-08
-    Last updated by Karl Debiec on 13-11-15"""
-########################################### MODULES, SETTINGS, AND DEFAULTS ############################################
-import os, sys, warnings
+#   MD_toolkit.secondary.diffusion.translation.__init__.py
+#   Written by Karl Debiec on 13-02-08
+#   Last updated by Karl Debiec on 14-04-04
+################################################# MODULES AND SETTINGS #################################################
+import os, sys
 import numpy as np
-from   scipy.optimize    import curve_fit
+from   MD_toolkit.standard_functions import block, ignore_index, fit_curve
 ################################################## ANALYSIS FUNCTIONS ##################################################
-def _block(data, function, **kwargs):
-    full_size       = data.size
-    sizes           = np.array(sorted(list(set([full_size / x for x in range(1, full_size)]))), np.int)[:-1]
-    sds             = np.zeros(sizes.size)
-    n_blocks        = full_size // sizes
-    for i, size in enumerate(sizes):
-        resized     = np.resize(data, (full_size // size, size))
-        values      = function(resized, **kwargs)
-        sds[i]      = np.std(values)
-    ses             = sds / np.sqrt(n_blocks)
-    return sizes, ses
+def translation(hdf5_file, time, com, delta_ts, name, selection, destination,
+                verbose = False, debug = False, n_cores = 1, **kwargs):
+    """
+    Calculates the translational diffusion coefficient of one or more selections of atoms.
 
-def _fit_sigmoid(x, y):
-    def func(x, min_asym, max_asym, poi, k): return max_asym + (min_asym - max_asym) / (1 + (x / poi) ** k)
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-        min_asym, max_asym, poi, k  = curve_fit(func, x, y, maxfev = 100000)[0]
-    y_fit   = func(x, min_asym, max_asym, poi, k)
-    return min_asym, max_asym, poi, k, y_fit
+    **Arguments:**
+        :*hdf5_file*:   HDF5_File object
+        :*time*:        simulation time
+        :*com*:         centers of mass of selections; dimensions = (time, selection, xyz)
+        :*delta_ts*:    delta t(s) over which to calculate diffusion
+        :*name*:        names of selections
+        :*selection*:   resides ordescription of selections(not used for calculation, just copied for reference)
+        :*destination*: path in h5 file at which to store output
 
-def translation(hdf5_file,
-                destination     = "",                       # Origin of primary data and destination of secondary data
-                delta_t         = np.array([0.1]),          # Delta_t values to test (ns)
-                selection       = [],                       # Selection names 
-                explicit_names  = False,                    # Explicitly name selections in output table
-                control         = np.nan,                   # Control value for comparison (if verbose)
-                verbose         = False, n_cores = 1, **kwargs):
-    """ Calculates the translational diffusion coefficient of <selection>(s) over intervals of <delta_t>. Stores in a
-        table at <destination> numbered either as 0, 1, 2, ... or with explicit selection strings if <explicit_names>.
-        Follows the protocol of McGuffee, S. R., and Elcock, A. H. PLoS Comp Bio. 2010. e1000694. Error is estimated
-        using the blocking method of Flyvbjerg, H., and Petersen, H. G. Error Estimates on Averages of Correlated Data.
-        J Phys Chem. 1989. 91. 461-466."""
-    if not (destination == "" or destination.startswith("_")):
-        destination = "_" + destination
-    time            = hdf5_file.data["*/log"]["time"]
-    com             = hdf5_file.data["*/com" + destination]
-    size            = time.size
-    dt              = time[1] - time[0]
-    n_selections    = com.shape[1]
-    selection_attr  = " ".join(["\"{0}\"".format(sel) for sel in selection])
-    D_table         = []
-    dtype           = [("delta t", "f4")]
-    for i, selection in enumerate(selection):
-        if explicit_names:  dtype  += [("{0} D".format(selection), "f4"), ("{0} D se".format(selection), "f4")]
-        else:               dtype  += [("{0} D".format(selection), "f4"), ("{0} D se".format(selection), "f4")]
-    attrs   = {"time": time[-1], "delta t units": "ns", "D units": "A2 ps-1", "selection": selection_attr}
+    **Returns:**
+        PENDING
 
-    def calc_D_block(dr_2, delta_t): return  np.mean(dr_2, axis = 1) / (6 * delta_t)
+    Follows the protocol of McGuffee, S. R., and Elcock, A. H. PLoS Comp Bio. 2010. e1000694.
+    Standard error is estimated using the block averaging method of Flyvbjerg, H., and Petersen, H. G. Error Estimates
+    on Averages of Correlated Data. J Phys Chem. 1989. 91. 461-466.
+    """
 
-    for delta_t in delta_t:
-        D_table        += [[delta_t]]
+    # Initialize variables
+    dt          = np.mean(time[1:] - time[:-1])
+    dtype       = [("delta t", "f4")]
+    for n in name.split("\n"):
+        dtype  += [("{0} D".format(n), "f4"), ("{0} D se".format(n), "f4")]
+
+    # Calculate translational diffusion
+    data    = []
+    for delta_t in delta_ts:
+        def calc_D_block(delta_xyz_2):                                          # Re-define within loop because map()
+            return  np.mean(delta_xyz_2, axis = 1) / (6 * delta_t) / 1000.0     # cannot pass delta_t variable
+        data           += [[delta_t]]
         delta_t_index   = int(np.round(delta_t / dt))
-        dr_2            = np.sum((com[delta_t_index:] - com[:-delta_t_index]) ** 2, axis = 2)
-        for j in xrange(dr_2.shape[1]):
-            x, y        = _block(dr_2[:,j], calc_D_block, delta_t = delta_t)
-            try:
-                _, max_asym, _, _, _    = _fit_sigmoid(x, y)
-            except:
-                max_asym                = np.nan
-                attrs["note"]           = "Standard error calculation failed for one or more delta t"
-            D_table[-1]    += [np.mean(dr_2[:,j], axis = 0) / (6 * delta_t) / 1000.0, max_asym / 1000.0]
-    for i in xrange(len(D_table)):
-        D_table[i]          = tuple(D_table[i])
-    D_table                 = np.array(D_table, np.dtype(dtype))
+        delta_xyz_2     = np.sum((com[delta_t_index:] - com[:-delta_t_index]) ** 2, axis = 2)
+        D               = np.mean(delta_xyz_2, axis = 0) / (6 * delta_t) / 1000.0
+        for i, n in enumerate(name.split("\n")):
+            sizes, ses, se_sds    = block(delta_xyz_2[:,i], calc_D_block, min_size = 10)
+            D_se, b, c, fit       = fit_curve(x = sizes, y = ses, sigma = se_sds,
+                                              fit_func = "single_exponential", p0 =(1.0, -1.0, -1.0))
+            data[-1]             += [D[i], D_se]
 
-    if verbose:     _print_translation(D_table, attrs)
-    return  [("diffusion/translation" + destination, D_table),
-             ("diffusion/translation" + destination, attrs)]
+    # Organize and return data
+    data    = np.array([tuple(D) for D in data], dtype)
+    attrs   = {"time": "{0:.3f} {1:.3f}".format(float(time[0]), float(time[-1])),
+               "delta t units": "ns",
+               "D units":       "A2 ps-1",
+               "selection":     selection}        
+    if verbose:     _print_translation(data, attrs)
+    return  [(destination, data),
+             (destination, attrs)]
+
 def _check_translation(hdf5_file, force = False, **kwargs):
-    destination = kwargs.get("destination", "")
-    delta_ts    = kwargs.get("delta_t",     np.array([0.1]))
-    verbose     = kwargs.get("verbose",     False)
-    if not (destination == "" or destination.startswith("_")):
-        destination = "_" + destination
-    selection           = hdf5_file.attrs("0000/com" + destination)["selection"].split("\" \"")
-    selection           = [sel.strip("\"") for sel in selection]
-    kwargs["selection"] = selection
 
-    hdf5_file.load("*/log", type = "table")
-    hdf5_file.load("*/com" + destination)
+    # Parse kwargs and set defaults
+    source                              = kwargs.get("source",      "*/com_unwrap")
+    source                              = source if source.startswith("*/") else "*/" + source
+    ignore                              = kwargs.pop("ignore",      0)
+    kwargs["delta_ts"]    = delta_ts    = kwargs.get("delta_ts",    np.array([0.1]))
+    kwargs["destination"] = destination = kwargs.get("destination", "/diffusion/translation")
+    kwargs["selection"]                 = hdf5_file.attrs("0000/" + source[2:])["selection"]        # Still not ideal,
+    kwargs["name"]                      = hdf5_file.attrs("0000/" + source[2:])["name"]             # fix in future
 
-    if (force
-    or not("diffusion/translation" + destination in hdf5_file)):
+    # If analysis has not been run previously, run analysis
+    if     (force
+    or not (destination in hdf5_file)):
+        log             = hdf5_file.load("*/log", type = "table")
+        index           = ignore_index(log["time"], ignore)
+        kwargs["time"]  = log["time"][index:]
+        kwargs["com"]   = hdf5_file.load(source)[index:]
         return [(translation, kwargs)]
 
-    data    = hdf5_file["diffusion/translation" + destination]
-    attrs   = hdf5_file.attrs("diffusion/translation" + destination)
-
-    if (np.any(np.array(delta_ts, np.float32) != data["delta t"])
-    or (hdf5_file.data["*/log"]["time"][-1]   != attrs["time"])):
+    # If analysis has been run previously but with different settings, run analysis
+    data            = hdf5_file[destination]
+    attrs           = hdf5_file.attrs(destination)
+    log             = hdf5_file.load("*/log", type = "table")
+    index           = ignore_index(log["time"], ignore)
+    kwargs["time"]  = log["time"][index:]
+    if (np.any(data["delta t"] != np.array(delta_ts, np.float32))
+    or (attrs["time"]          != "{0:.3f} {1:.3f}".format(float(kwargs["time"][0]), float(kwargs["time"][-1])))):
+        kwargs["com"]   = hdf5_file.load(source)[index:]
         return [(translation, kwargs)]
-    elif verbose:   _print_translation(data, attrs)
+
+    # If analysis has been run previously with the same settings, output data and return
+    if kwargs.get("verbose", False):    _print_translation(data, attrs)
     return False
+
 def _print_translation(data, attrs):
-    selection   = [sel.strip("\"") for sel in attrs["selection"].split("\" \"")]
-    print "DURATION {0:5d} ns".format(int(attrs["time"]))
-    print "DELTA_T  ",
-    for sel in selection:
-        print "{0:<9}{1:<9}".format(sel, "(se)"),
+    names = [n for n in data.dtype.names[1::2]]
+    print "TIME     {0:.3f} ns - {1:.3f} ns".format(*map(float, attrs["time"].split()))
+    print "DURATION {0:.3f} ns".format(float(attrs["time"].split()[1]) - float(attrs["time"].split()[0]))
+    print "DELTA T", 
+    for name in names: print "{0:>16} (se)".format(name).upper(),
     print
-    for line in data:
-        print "{0:<9.3f}".format(float(line[0])),
-        for i, sel in enumerate(selection):
-            print "{0:<9.5f}({1:7.5f})".format(float(line[i*2+1]), float(line[i*2+2])),
+    for D in data:
+        print "{0:>7.3f}".format(float(D[0])),
+        for name in names:
+            print "{0:>21}".format("{0:>7.5f} ({1:>7.5f})".format(float(D[name]), float(D[name + " se"]))),
         print
+
 

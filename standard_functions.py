@@ -1,8 +1,10 @@
 #!/usr/bin/python
-desc = """MD_toolkit.standard_functions.py
-    Standard functions
-    Written by Karl Debiec on 13-02-03
-    Last updated by Karl Debiec on 13-11-15"""
+#   MD_toolkit.standard_functions.py
+#   Written by Karl Debiec on 13-02-03
+#   Last updated by Karl Debiec on 14-04-04
+"""
+Standard functions
+"""
 ########################################### MODULES, SETTINGS, AND DEFAULTS ############################################
 import commands, os, subprocess, sys
 from   importlib import import_module
@@ -84,6 +86,20 @@ def shell_iterator(command, leader = "", verbose = False, **kwargs):
         if verbose: print leader + line.rstrip().replace("\n", " ")
         yield             leader + line.rstrip().replace("\n", " ")
     pipe.wait()
+def block(data, func, min_size = 3):
+    full_size   = data.shape[0]
+    sizes       = [s for s in list(set([full_size / s for s in range(1, full_size)])) if s >= min_size]
+    sizes       = np.array(sorted(sizes), np.int)[:-1]
+    sds         = np.zeros(sizes.size)
+    n_blocks    = full_size // sizes
+    for i, size in enumerate(sizes):
+        resized = np.resize(data, (full_size // size, size, 3))
+        values  = map(func, resized)
+        sds[i]  = np.std(values)
+    ses                 = sds / np.sqrt(n_blocks - 1.0)
+    se_sds              = np.sqrt((2.0) / (n_blocks - 1.0)) * ses
+    se_sds[se_sds == 0] = se_sds[np.where(se_sds == 0)[0] + 1]
+    return sizes, ses, se_sds
 def block_average(data, func = np.mean, func_kwargs = {"axis": 1}, min_size = 1, **kwargs):
     full_size   = data.size
     sizes       = [s for s in list(set([full_size / s for s in range(1, full_size)])) if s >= min_size]
