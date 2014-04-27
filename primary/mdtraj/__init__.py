@@ -18,7 +18,7 @@ def dipole(segment, destination, solvent, verbose = True, **kwargs):
     # Prepare charges for selected solute
     if   solvent.lower() in ["spce"]:
         O_chg, H_chg, M_chg, M_d, resnames = -0.83400, 0.41700, None,     None,   ["HOH", "SPC"]
-    elif solvent.lower() in ["tip3p", "tips3p"]:
+    elif solvent.lower() in ["mtip3p", "tip3p"]:
         O_chg, H_chg, M_chg, M_d, resnames = -0.84760, 0.42380, None,     None,   ["HOH", "T3P"]
     elif solvent.lower() in ["tip4p"]:
         O_chg, H_chg, M_chg, M_d, resnames =  0.0,     0.52000, -1.04000, 0.15,   ["HOH", "T4P"]
