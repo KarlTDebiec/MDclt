@@ -22,6 +22,8 @@ def dist(segment, destination, selection_1, selection_2, **kwargs):
     distance    = np.zeros((len(trj.trajectory), len(selection_1), len(selection_2)), np.float32)
     for i, frame in enumerate(trj.trajectory):
         distance[i] = _cy_distance_pbc(selection_1.coordinates(), selection_2.coordinates(), side_length)
+
+    # Return results
     return  [(segment + "/" + destination,  distance)]
 def _check_dist(hdf5_file, segment, force = False, **kwargs):
     if not (segment.topology   and os.path.isfile(segment.topology)
@@ -37,6 +39,8 @@ def _check_dist(hdf5_file, segment, force = False, **kwargs):
 
 def comdist(segment, selection_1, selection_2, mode = "residue", **kwargs):
     """ Calculates center of mass distance between two selections or residue types; assumes cubic box and pbc """
+
+    # Load trajectory and selections
     trj         = md.Universe(segment.topology, segment.trajectory)
     if   mode  == "residue":
         mol1s   = [r.atoms for r in trj.residues if r.name == selection_1]
@@ -44,6 +48,8 @@ def comdist(segment, selection_1, selection_2, mode = "residue", **kwargs):
     elif mode  == "selection":
         mol1s   = [trj.selectAtoms(selection_1)]
         mol2s   = [trj.selectAtoms(selection_2)]
+
+    # Calculate center of mass distances
     mol1s_com   = np.zeros((len(mol1s), 3), np.float32)
     mol2s_com   = np.zeros((len(mol2s), 3), np.float32)
     comdist     = np.zeros((len(trj.trajectory), len(mol1s), len(mol2s)), np.float32)
@@ -51,6 +57,8 @@ def comdist(segment, selection_1, selection_2, mode = "residue", **kwargs):
         for j, mol1 in enumerate(mol1s):  mol1s_com[j] = mol1.centerOfMass()
         for j, mol2 in enumerate(mol2s):  mol2s_com[j] = mol2.centerOfMass()
         comdist[i]  = _cy_distance_pbc(mol1s_com, mol2s_com, float(frame.dimensions[0]))
+
+    # Return results
     return  [(segment + "/association_comdist", comdist),
              (segment + "/association_comdist", {"units": "A"})]
 def _check_comdist(hdf5_file, segment, force = False, **kwargs):
@@ -64,6 +72,8 @@ def _check_comdist(hdf5_file, segment, force = False, **kwargs):
 
 def mindist(segment, selection_1, selection_2, mode = "residue", destination = "association_mindist", **kwargs):
     """ Calculates minimum distance between two selections or two residue types; assumes cubic box and pbc """
+
+    # Load trajectory and selections
     trj         = md.Universe(segment.topology, segment.trajectory)
     if   mode  == "residue":
         res1, sel1  = selection_1
@@ -75,6 +85,11 @@ def mindist(segment, selection_1, selection_2, mode = "residue", destination = "
     elif mode  == "selection":
         mol1s   = [trj.selectAtoms(selection_1)]
         mol2s   = [trj.selectAtoms(selection_2)]
+    if kwargs.get("debug", False):
+        print "Selection 1 is '{0}' and contains {1}".format(selection_1, mol1s[0].atoms.names())
+        print "Selection 2 is '{0}' and contains {1}".format(selection_2, mol2s[0].atoms.names())
+
+    # Calculate minimum distances
     distance    = np.zeros((len(mol1s[0].atoms), len(mol2s[0].atoms)),    np.float32)
     mindist     = np.zeros((len(trj.trajectory), len(mol1s), len(mol2s)), np.float32)
     for i, frame in enumerate(trj.trajectory):
@@ -82,6 +97,8 @@ def mindist(segment, selection_1, selection_2, mode = "residue", destination = "
             for k, mol2 in enumerate(mol2s):
                 distance         = _cy_distance_pbc(mol1.coordinates(), mol2.coordinates(), float(frame.dimensions[0]))
                 mindist[i, j, k] = np.min(distance)
+
+    # Return results
     return  [(segment + "/" + destination, mindist),
              (segment + "/" + destination, {"units": "A"})]
 def _check_mindist(hdf5_file, segment, force = False, **kwargs):

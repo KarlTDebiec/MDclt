@@ -55,7 +55,7 @@ def dielectric(hdf5_file,
 def _check_dielectric(hdf5_file, force = False, **kwargs):
     # Water molecule volumes for various water models; should probably be recalculated for each simulation protocol
     water_V = {"SPCE":      (56.72962952 ** 3.0) / 6093, "TIP3P":     (56.73929214 ** 3.0) / 6017,
-               "TIPS3P":    (56.76272202 ** 3.0) / 6209, "TIP4P":     (56.67108536 ** 3.0) / 6042,
+               "MTIP3P":    (56.76272202 ** 3.0) / 6209, "TIP4P":     (56.67108536 ** 3.0) / 6042,
                "TIP4P2005": (56.69507980 ** 3.0) / 6071, "TIP4PEW":   (56.70848083 ** 3.0) / 6063}
     
     # Parse kwargs and set defaults

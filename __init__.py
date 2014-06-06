@@ -24,6 +24,7 @@ def analyze_primary(hdf5_filename, path, analyses, segment_lister = "MD_toolkit.
         2) Builds task list based on requested <analyses>, data present in <hdf5_filename>, and listed segments
         3) Distributes tasks across <n_cores> and writes results to <hdf5_filename> """
     if verbose: print("Analyzing trajectory at {0}".format(path.replace("//","/")))
+    if verbose: print("Using HDF5 file at {0}".format(hdf5_filename.replace("//","/")))
 
     for module in set(["MD_toolkit.primary." + m[:m.rfind(".")] for m, _ in analyses if m.rfind(".")!=-1]):
         import_module(module)
@@ -114,7 +115,6 @@ def analyze_secondary(hdf5_filename, analyses, n_cores = 1, verbose = True, **kw
     with HDF5_File(hdf5_filename) as hdf5_file:
         task_list = []
         for module_function, kwargs in analyses:
-            if verbose: print
             kwargs["verbose"] = kwargs.get("verbose", verbose)
             module   = ".".join(module_function.split(".")[:-1])
             function = module_function.split(".")[-1]
@@ -133,7 +133,6 @@ def analyze_secondary(hdf5_filename, analyses, n_cores = 1, verbose = True, **kw
                 task_list     += new_tasks
 
         for function, kwargs in task_list:
-            if verbose: print
             kwargs["n_cores"] = n_cores
             results = function(hdf5_file, **kwargs)
             if  not results:            continue
