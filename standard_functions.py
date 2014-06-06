@@ -2,8 +2,8 @@
 desc = """MD_toolkit.standard_functions.py
     Standard functions
     Written by Karl Debiec on 13-02-03
-    Last updated by Karl Debiec on 13-11-15"""
-########################################### MODULES, SETTINGS, AND DEFAULTS ############################################
+    Last updated by Karl Debiec on 14-04-04"""
+####################################################### MODULES ########################################################
 import commands, os, subprocess, sys
 from   importlib import import_module
 import numpy as np

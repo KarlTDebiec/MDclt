@@ -121,3 +121,25 @@ def _check_log(hdf5_file, segment, require_trajectory_files = False, force = Fal
             kwargs["time_offset"] = float(segment)
             return [(log, segment, kwargs)]
     else:   return False
+
+def checkpoint(segment, **kwargs):
+    # hack to get checkpoint file -- is previous wanted as well?
+    segment.files   = filter(lambda f: "_prev.cpt" not in f, segment.files)
+    cpt             = segment[".cpt"]
+    attr            = {"file" : cpt}
+    with open(cpt, "rb") as cpt_file:
+        cpt_bits    = cpt_file.read()
+    checkpoint      = np.array(cpt_bits, dtype="S{}".format(len(cpt_bits)))
+    # to get back, just have to get from hdf5 file as string, s
+    # new_checkpoint.write(s)
+    return [(segment + "/checkpoint", checkpoint, {"data_kwargs": {"chunks": False}}),
+            (segment + "/checkpoint", attr)]
+
+def _check_checkpoint(hdf5_file, segment, force = False, **kwargs):
+    if not (segment.topology   and os.path.isfile(segment.topology)
+    and     segment.trajectory and os.path.isfile(segment.trajectory)):
+            return False
+    if    (force
+    or not segment + "/checkpoint" in hdf5_file):
+            return [(checkpoint, segment, kwargs)]
+    else:   return False

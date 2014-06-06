@@ -2,14 +2,15 @@
 desc = """MD_toolkit.HDF5_File.py
     Class for simplifying interaction with HDF5 files
     Written by Karl Debiec on 13-02-03
-    Last updated by Karl Debiec 13-11-15"""
-########################################### MODULES, SETTINGS, AND DEFAULTS ############################################
+    Last updated by Karl Debiec on 14-04-04"""
+####################################################### MODULES ########################################################
 import commands, os, sys, types
 import h5py
 import numpy as np
 from   MD_toolkit.standard_functions import is_num, Function_to_Method_Wrapper
 ######################################################## CLASS #########################################################
 class HDF5_File:
+    """ Base class for abstracting HDF5 interaction """
     def __init__(self, filename):
         self.filename   = os.path.abspath(filename)
         self.file       = None
@@ -107,3 +108,5 @@ class HDF5_File:
     def attrs(self, path, **kwargs):
         if not self.file: self._open_file()
         return dict(self.hierarchy[self._strip_path(path)].attrs)
+
+
