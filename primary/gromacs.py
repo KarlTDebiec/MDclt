@@ -1,13 +1,14 @@
 #!/usr/bin/python
-desc = """MD_toolkit.primary.gromacs.py
-    Functions for primary analysis of GROMACS trajectories
-    Written by Karl Debiec on 12-11-30
-    Last updated by Karl Debiec on 13-11-15"""
-########################################### MODULES, SETTINGS, AND DEFAULTS ############################################
+#   MD_toolkit.primary.gromacs.py
+#   Written by Karl Debiec on 12-11-30, last updated by Karl Debiec on 14-06-07
+"""
+Functions for primary analysis of GROMACS trajectories
+"""
+####################################################### MODULES ########################################################
 import commands, os, sys
 import numpy as np
 from   MD_toolkit.standard_functions import is_num, month
-################################################## ANALYSIS FUNCTIONS ##################################################
+###################################################### FUNCTIONS #######################################################
 def log(segment, time_offset = 0.0, **kwargs):
     """ Parses log for <segment> """
     log         = segment[".log"]

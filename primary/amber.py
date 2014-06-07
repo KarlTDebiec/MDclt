@@ -1,14 +1,17 @@
 #!/usr/bin/python
-desc = """MD_toolkit.primary.amber.py
-    Functions for primary analysis of AMBER trajectories
-    Written by Karl Debiec on 12-12-01
-    Last updated by Karl Debiec on 13-11-15"""
-########################################### MODULES, SETTINGS, AND DEFAULTS ############################################
+#   MD_toolkit.primary.amber.py
+#   Written by Karl Debiec on 12-12-01, last updated by Karl Debiec on 14-06-06
+"""
+Functions for primary analysis of AMBER trajectories
+"""
+####################################################### MODULES ########################################################
 import commands, os, sys
 import numpy as np
-################################################## ANALYSIS FUNCTIONS ##################################################
+###################################################### FUNCTIONS #######################################################
 def log(segment, time_offset = 0.0, **kwargs):
-    """ Parses log for <segment> """
+    """
+    Parses log for <segment>
+    """
     log         = segment[".out"]
     nstlim      = float(commands.getoutput("grep nstlim " + log).split()[2][:-1])
     ntpr        = float(commands.getoutput("grep ntpr   " + log).split()[2][:-1])
@@ -111,3 +114,5 @@ def _check_log(hdf5_file, segment, require_trajectory_files = False, force = Fal
     if    (force
     or not segment + "/log" in hdf5_file): return [(log, segment, kwargs)]
     else:                                  return False
+
+

@@ -1,9 +1,16 @@
 #!/usr/bin/python
-desc = """MD_toolkit.__init__.py
-    Toolkit for analysis of molecular dynamics simulations
-    Written by Karl Debiec on 12-02-12
-    Last updated by Karl Debiec on 13-11-15"""
-########################################### MODULES, SETTINGS, AND DEFAULTS ############################################
+#   MD_toolkit.__init__.py
+#    Written by Karl Debiec on 12-02-12, last updated by Karl Debiec on 14-06-06
+"""
+Toolkit for analysis of molecular dynamics simulations
+
+.. todo:
+    - Rewrite analysis functions as classes
+    - Consider using WESTPA's work manager
+    - Use mdtraj
+    - Documentation
+"""
+####################################################### MODULES ########################################################
 import inspect, os, sys, types
 import h5py
 import numpy as np
@@ -12,8 +19,10 @@ from   importlib import import_module
 from   MD_toolkit.HDF5_File import HDF5_File
 from   MD_toolkit.standard_functions import string_to_function
 np.set_printoptions(precision = 3, suppress = True, linewidth = 120)
-#################################################### CORE FUNCTIONS ####################################################
+###################################################### FUNCTIONS #######################################################
 def _primary_pool_director(task):
+    """
+    """
     function, segment, kwargs = task
     return function(segment, **kwargs)
 
