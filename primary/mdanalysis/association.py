@@ -1,8 +1,9 @@
 #!/usr/bin/python
-desc = """MD_toolkit.primary.mdanalysis.association.py
-    Functions for primary analysis of molecular association using MDAnalysis
-    Written by Karl Debiec on 12-11-30
-    Last updated by Karl Debiec on 13-12-18"""
+#   MD_toolkit.primary.mdanalysis.association.py
+#   Written by Karl Debiec on 12-11-30, last updated by Karl Debiec on 14-06-10
+"""
+Functions for primary analysis of molecular association using MDAnalysis
+"""
 ####################################################### MODULES ########################################################
 import os, sys
 import numpy as np
@@ -10,7 +11,9 @@ import MDAnalysis as md
 from   cython_functions import _cy_distance_pbc
 ################################################## ANALYSIS FUNCTIONS ##################################################
 def dist(segment, destination, selection_1, selection_2, **kwargs):
-    """ Calculates interatomic distances between <selection_1> and <selection_2>, accounting for cubic pbc """
+    """
+    Calculates interatomic distances between <selection_1> and <selection_2>, accounting for cubic pbc
+    """
 
     # Load trajectory and selections
     trj         = md.Universe(segment.topology, segment.trajectory)
@@ -25,6 +28,7 @@ def dist(segment, destination, selection_1, selection_2, **kwargs):
 
     # Return results
     return  [(segment + "/" + destination,  distance)]
+
 def _check_dist(hdf5_file, segment, force = False, **kwargs):
     if not (segment.topology   and os.path.isfile(segment.topology)
     and     segment.trajectory and os.path.isfile(segment.trajectory)):
@@ -37,8 +41,11 @@ def _check_dist(hdf5_file, segment, force = False, **kwargs):
             return [(dist, segment, kwargs)]
     else:   return False
 
+
 def comdist(segment, selection_1, selection_2, mode = "residue", **kwargs):
-    """ Calculates center of mass distance between two selections or residue types; assumes cubic box and pbc """
+    """
+    Calculates center of mass distance between two selections or residue types; assumes cubic box and pbc
+    """
 
     # Load trajectory and selections
     trj         = md.Universe(segment.topology, segment.trajectory)
@@ -61,6 +68,7 @@ def comdist(segment, selection_1, selection_2, mode = "residue", **kwargs):
     # Return results
     return  [(segment + "/association_comdist", comdist),
              (segment + "/association_comdist", {"units": "A"})]
+
 def _check_comdist(hdf5_file, segment, force = False, **kwargs):
     if not (segment.topology   and os.path.isfile(segment.topology)
     and     segment.trajectory and os.path.isfile(segment.trajectory)):
@@ -70,8 +78,11 @@ def _check_comdist(hdf5_file, segment, force = False, **kwargs):
             return [(comdist, segment, kwargs)]
     else:   return False
 
+
 def mindist(segment, selection_1, selection_2, mode = "residue", destination = "association_mindist", **kwargs):
-    """ Calculates minimum distance between two selections or two residue types; assumes cubic box and pbc """
+    """
+    Calculates minimum distance between two selections or two residue types; assumes cubic box and pbc
+    """
 
     # Load trajectory and selections
     trj         = md.Universe(segment.topology, segment.trajectory)
@@ -101,6 +112,7 @@ def mindist(segment, selection_1, selection_2, mode = "residue", destination = "
     # Return results
     return  [(segment + "/" + destination, mindist),
              (segment + "/" + destination, {"units": "A"})]
+
 def _check_mindist(hdf5_file, segment, force = False, **kwargs):
     destination = kwargs.get("destination", "association_mindist")
     if not (segment.topology   and os.path.isfile(segment.topology)

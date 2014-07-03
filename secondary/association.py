@@ -5,7 +5,7 @@
 """
 Functions for secondary analysis of molecular association
 """
-########################################### MODULES, SETTINGS, AND DEFAULTS ############################################
+####################################################### MODULES ########################################################
 import os, sys, time, types, warnings
 import numpy as np
 from   scipy.optimize import fmin
@@ -377,7 +377,7 @@ def exchange(hdf5_file,
                 koff,         koff_se           = np.nan, np.nan
 
             # Cleanup large unneeded numpy arrays (may or may not make a difference)
-            del(distance, unbound, sizes, trans_bound, trans_unbound, enter_bound, enter_unbound, fpt_on, fpt_off)
+            del(distance, unbound, sizes, trans_bound, trans_unbound, enter_bound, enter_unbound)
 
             # Organize data
             count[:, j]                                                        += bound

@@ -63,10 +63,11 @@ def log(segment, **kwargs):
 #                       ("DRBONDAVG", "?",                "?")
                       ]
     for source, destination, units in field_info:
-        formatted_data += [data[source]]
-        dtype          += [(destination, "f4")]
-        attrs["{0} units".format(destination)] = units
-    data = np.array(formatted_data, dtype)
+        if source in data:
+            formatted_data += [data[source]]
+            dtype          += [(destination, "f4")]
+            attrs["{0} units".format(destination)] = units
+    data = np.array([tuple(frame) for frame in np.column_stack(formatted_data)[1:]], dtype)
     return [(segment + "/log",  data),
             (segment + "/log",  attrs),
             (segment + "/",     seg_attrs)]

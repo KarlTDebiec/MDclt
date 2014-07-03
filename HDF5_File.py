@@ -1,8 +1,9 @@
 #!/usr/bin/python
-desc = """MD_toolkit.HDF5_File.py
-    Class for simplifying interaction with HDF5 files
-    Written by Karl Debiec on 13-02-03
-    Last updated by Karl Debiec on 14-04-04"""
+#   MD_toolkit.HDF5_File.py
+#   Written by Karl Debiec on 13-02-03, last updated by Karl Debiec on 14-06-10
+"""
+Class for simplifying interaction with HDF5 files
+"""
 ####################################################### MODULES ########################################################
 import commands, os, sys, types
 import h5py
