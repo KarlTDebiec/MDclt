@@ -1,8 +1,8 @@
 #!/usr/bin/python
-#   MD_toolkit.__init__.py
-#    Written by Karl Debiec on 12-02-12, last updated by Karl Debiec on 14-06-06
+#   MDclt.__init__.py
+#    Written by Karl Debiec on 12-02-12, last updated by Karl Debiec on 14-07-03
 """
-Toolkit for analysis of molecular dynamics simulations
+Command Line Tools for analysis of molecular dynamics simulations
 
 .. todo:
     - Rewrite analysis functions as classes
@@ -10,143 +10,68 @@ Toolkit for analysis of molecular dynamics simulations
     - Use mdtraj
     - Documentation
 """
-####################################################### MODULES ########################################################
-import inspect, os, sys, types
-import h5py
-import numpy as np
-from   multiprocessing import Pool
-from   importlib import import_module
-from   MD_toolkit.HDF5_File import HDF5_File
-from   MD_toolkit.standard_functions import string_to_function
-np.set_printoptions(precision = 3, suppress = True, linewidth = 120)
-###################################################### FUNCTIONS #######################################################
-def _primary_pool_director(task):
-    """
-    """
-    function, segment, kwargs = task
-    return function(segment, **kwargs)
-
-def analyze_primary(hdf5_filename, path, analyses, segment_lister = "MD_toolkit.standard_functions.segments_standard",
-    n_cores = 1, verbose = True, **kwargs):
-    """ Performs primary analysis (analysis of trajectories directly)
-        1) Builds list of trajectory segments at <path> using function <segment_lister>
-        2) Builds task list based on requested <analyses>, data present in <hdf5_filename>, and listed segments
-        3) Distributes tasks across <n_cores> and writes results to <hdf5_filename> """
-    if verbose: print("Analyzing trajectory at {0}".format(path.replace("//","/")))
-    if verbose: print("Using HDF5 file at {0}".format(hdf5_filename.replace("//","/")))
-
-    for module in set(["MD_toolkit.primary." + m[:m.rfind(".")] for m, _ in analyses if m.rfind(".")!=-1]):
-        import_module(module)
-
-    if    isinstance(segment_lister, types.FunctionType): segments = segment_lister(path)
-    elif  isinstance(segment_lister, types.StringTypes):  segments = string_to_function(segment_lister)(path)
-    else: raise Exception("segment_lister must be a function or string in format of 'module.function'")
-
-    with HDF5_File(hdf5_filename) as hdf5_file:
-        check_functions = {}
-        task_list       = []
-        for module_function, kwargs in analyses:
-            if module_function.find(".") != -1:
-                module   = "MD_toolkit.primary." + ".".join(module_function.split(".")[:-1])
-                function = module_function.split(".")[-1]
-            else:
-                module   = "MD_toolkit.primary"
-                function = module_function
-            check_functions[module_function] = getattr(sys.modules[module], "_check_" + function)
-        for segment in segments:
-            for module_function, kwargs in analyses:
-                check_function  = check_functions[module_function]
-                new_tasks       = check_function(hdf5_file, segment, **kwargs)
-                if new_tasks:
-                    task_list  += new_tasks
-
-        if verbose: print("{0} tasks to be completed for {1} segments using {2} cores".format(
-                          len(task_list),len(segments),n_cores))
-        pool    = Pool(n_cores)
-        for results in pool.imap_unordered(_primary_pool_director, task_list):
-            if not results: continue
-            for result in results:
-                if   len(result)  == 2: hdf5_file.add(result[0], result[1])
-                else:                   hdf5_file.add(result[0], result[1], **result[2])
-        pool.close()
-        pool.join()
-
-def analyze_primary_x(hdf5_filename, path, analyses, segment_lister = "MD_toolkit.standard_functions.segments_standard",
-    n_cores = 1, verbose = True, **kwargs):
-    """ Performs primary cross-segment analysis (analysis of trajectories directly)
-        1) Builds list of trajectory segments at <path> using function <segment_lister>
-        2) Builds task list based on requested <analyses>, data present in <hdf5_filename>, and listed segments
-        3) Completes tasks in serial, using <n_cores> for each task (if implemented), and writes results to
-           <hdf5_filename> """
-    if verbose: print("Analyzing trajectory at {0}".format(path.replace("//","/")))
-
-    import_module("MD_toolkit.primary_x")
-    for module in set(["MD_toolkit.primary_x." + m[:m.rfind(".")] for m, _ in analyses if m.rfind(".")!=-1]):
-        import_module(module)
-
-    if    isinstance(segment_lister, types.FunctionType): segments = segment_lister(path)
-    elif  isinstance(segment_lister, types.StringTypes):  segments = string_to_function(segment_lister)(path)
-    else: raise Exception("segment_lister must be a function or string in format of 'module.function'")
-
-    with HDF5_File(hdf5_filename) as hdf5_file:
-        task_list = []
-        for module_function, kwargs in analyses:
-            if module_function.find(".") != -1:
-                module     = "MD_toolkit.primary_x." + ".".join(module_function.split(".")[:-1])
-                function   = module_function.split(".")[-1]
-            else:
-                module     = "MD_toolkit.primary_x"
-                function   = module_function
-            check_function = getattr(sys.modules[module], "_check_" + function)
-
-            new_tasks      = check_function(hdf5_file = hdf5_file, segments = segments, **kwargs)
-            if new_tasks:
-                task_list += new_tasks
-
-        if verbose: print("{0} tasks to be completed for {1} segments using {2} cores".format(
-                          len(task_list), len(segments), n_cores))
-        for function, kwargs in task_list:
-            kwargs["n_cores"] = n_cores
-            for result in function(**kwargs):
-                if   len(result)  == 2: hdf5_file.add(result[0], result[1], **kwargs)
-                else:                   hdf5_file.add(result[0], result[1], **result[2])
-
-def analyze_secondary(hdf5_filename, analyses, n_cores = 1, verbose = True, **kwargs):
-    """ Performs secondary analysis (analysis of primary analysis)
-        1) Builds task list based on <analyses>, concurrently loads required data from <hdf5_filename>
-        2) Completes tasks in serial, using <n_cores> for each task (if implemented), and writes results to
-           <hdf5_filename> """
-    print("Analyzing file {0}".format(hdf5_filename.replace("//","/")))
-
-    for module in set(["MD_toolkit.secondary." + m[:m.rfind(".")] for m, _ in analyses if m.rfind(".")!=-1]):
-        import_module(module)
-
-    with HDF5_File(hdf5_filename) as hdf5_file:
-        task_list = []
-        for module_function, kwargs in analyses:
-            kwargs["verbose"] = kwargs.get("verbose", verbose)
-            module   = ".".join(module_function.split(".")[:-1])
-            function = module_function.split(".")[-1]
-            if module_function.startswith("custom"):
-                check_function  = getattr(inspect.getmodule(inspect.stack()[1][0]), "_check_" + function)
-            else:
-                if module_function.find(".") != -1:
-                    module     = "MD_toolkit.secondary." + ".".join(module_function.split(".")[:-1])
-                    function   = module_function.split(".")[-1]
-                else:
-                    module     = "MD_toolkit.secondary"
-                    function   = module_function
-                check_function = getattr(sys.modules[module], "_check_" + function)
-            new_tasks          = check_function(hdf5_file, **kwargs)
-            if new_tasks:
-                task_list     += new_tasks
-
-        for function, kwargs in task_list:
-            kwargs["n_cores"] = n_cores
-            results = function(hdf5_file, **kwargs)
-            if  not results:            continue
-            for result in results:
-                if   len(result)  == 2: hdf5_file.add(result[0], result[1], **kwargs)
-                else:                   hdf5_file.add(result[0], result[1], **result[2])
-
+################################################## GENERAL FUNCTIONS ###################################################
+def ignore_index(time, ignore):
+    if   ignore <  0:   return np.where(time > time[-1] + ignore - (time[1] - time[0]))[0][0]
+    elif ignore == 0:   return 0
+    elif ignore >  0:   return np.where(time > ignore)[0][0]
+def is_num(test):
+    try:    float(test)
+    except: return False
+    return  True
+def month(string):
+    month = {"jan":  1, "feb":  2, "mar":  3, "apr":  4, "may":  5, "jun":  6,
+             "jul":  7, "aug":  8, "sep":  9, "oct": 10, "nov": 11, "dec": 12}
+    try:    return month[string.lower()]
+    except: return None
+def block(data, func, min_size = 3):
+    full_size   = data.shape[0]
+    sizes       = [s for s in list(set([full_size / s for s in range(1, full_size)])) if s >= min_size]
+    sizes       = np.array(sorted(sizes), np.int)[:-1]
+    sds         = np.zeros(sizes.size)
+    n_blocks    = full_size // sizes
+    for i, size in enumerate(sizes):
+        resized = np.resize(data, (full_size // size, size, 3))
+        values  = map(func, resized)
+        sds[i]  = np.std(values)
+    ses                 = sds / np.sqrt(n_blocks - 1.0)
+    se_sds              = np.sqrt((2.0) / (n_blocks - 1.0)) * ses
+    se_sds[se_sds == 0] = se_sds[np.where(se_sds == 0)[0] + 1]
+    return sizes, ses, se_sds
+def block_average(data, func = np.mean, func_kwargs = {"axis": 1}, min_size = 1, **kwargs):
+    full_size   = data.size
+    sizes       = [s for s in list(set([full_size / s for s in range(1, full_size)])) if s >= min_size]
+    sizes       = np.array(sorted(sizes), np.int)[:-1]
+    sds         = np.zeros(sizes.size)
+    n_blocks    = full_size // sizes
+    for i, size in enumerate(sizes):
+        resized = np.resize(data, (full_size // size, size))
+        values  = func(resized, **func_kwargs)
+        sds[i]  = np.std(values)
+    ses                 = sds / np.sqrt(n_blocks - 1.0)
+#    se_sds              = np.sqrt((2.0) / (n_blocks - 1.0)) * ses
+    se_sds              = (1.0 / np.sqrt(2.0 * (n_blocks - 1.0))) * ses
+    if ses[-1] == 0.0 or se_sds[-1] == 0.0:                                     # This happens occasionally and
+        sizes   = sizes[:-1]                                                    # disrupts curve_fit; it is not clear
+        ses     = ses[:-1]                                                      # why
+        se_sds  = se_sds[:-1]
+    return sizes, ses, se_sds
+def fit_curve(fit_func = "single_exponential", **kwargs):
+    import warnings
+    from   scipy.optimize import curve_fit
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        def single_exponential(x, y, **kwargs):
+            def func(x, a, b, c):       return a + b * np.exp(c * x)
+            a, b, c       = curve_fit(func, x, y, **kwargs)[0]
+            return a, b, c, func(x, a, b, c)
+        def double_exponential(x, y, **kwargs):
+            def func(x, a, b, c, d, e): return a + b * np.exp(c * x) + d * np.exp(e * x)
+            a, b, c, d, e = curve_fit(func, x, y, **kwargs)[0]
+            return a, b, c, d, e, func(x, a, b, c, d, e)
+        def sigmoid(x, y, **kwargs):
+            def func(x, a, b, c, d):    return b + (a - b) / (1.0 + (x / c) ** d)
+            a, b, c, d    = curve_fit(func, x, y, **kwargs)[0]
+            return a, b, c, d, func(x, a, b, c, d)
+        return locals()[fit_func](**kwargs)
 
