@@ -1,118 +1,139 @@
 #!/usr/bin/python
-#   MD_toolkit.primary.amber.py
-#   Written by Karl Debiec on 12-12-01, last updated by Karl Debiec on 14-06-06
+#   MDclt.primary.amber.py
+#   Written by Karl Debiec on 12-12-01, last updated by Karl Debiec on 14-07-03
 """
 Functions for primary analysis of AMBER trajectories
 """
 ####################################################### MODULES ########################################################
-import commands, os, sys
+from __future__ import division, print_function
+import os, sys
 import numpy as np
-###################################################### FUNCTIONS #######################################################
-def log(segment, time_offset = 0.0, **kwargs):
+from MDclt.primary import Primary_Analysis
+####################################################### CLASSES ########################################################
+class Log(Primary_Analysis):
     """
-    Parses log for <segment>
+    Parses AMBER simulation logs
+
+    .. todo:
+        - Properly support appending data rather than reloading complete dataset
+        - Move to amber submodule
     """
-    log         = segment[".out"]
-    nstlim      = float(commands.getoutput("grep nstlim " + log).split()[2][:-1])
-    ntpr        = float(commands.getoutput("grep ntpr   " + log).split()[2][:-1])
-    dt          = float(commands.getoutput("grep dt     " + log).split()[2][:-1])
-    length      = nstlim / ntpr
-    with open(log, "r") as log:
-        raw     = [line.strip() for line in log.readlines()]
-    seg_attrs   = {}
-    i           = 0
-    data        = {}
-    data_loaded = False
-    
-    while i < len(raw):
-        line    = raw[i]
-        if   line.startswith("A V E R A G E S"):
-            data_loaded = True
-        if   line.startswith("| Running AMBER/MPI version on"):
-            line                    = line.split()
-            seg_attrs["n_cores"]    = int(line[5])
-        elif line.startswith("|  Master Total wall time"):
-            seconds                 = int(line.split()[5])
-            seg_attrs["duration"]   = "{0}:{1:02d}:{2:02d}".format(seconds//60//60, seconds//60%60, seconds%60)
-        elif line.startswith("| Run on"):
-            line                    = line.split()
-            seg_attrs["date"]       = "{0:02d}-{1:02d}-{2:02d}".format(int(line[3][8:]), int(line[3][:2]),
-                                                                       int(line[3][3:5]))
-            seg_attrs["time"]       = line[5]
-        elif line.startswith("NSTEP") and not data_loaded:
-            while True:
+
+    @classmethod
+    def add_parser(self, subparsers, *args, **kwargs):
+        """
+        Adds subparser arguments and argument groups to an argument parser
+
+        **Arguments:**
+            :*subparsers*: argparse subparsers object to add subparser
+            :*args*:       Passed to subparsers.add_parser(...)
+            :*kwargs*:     Passed to subparsers.add_parser(...)
+        """
+        super(Log, self).add_parser(subparsers, name = "log",
+          help = "Load AMBER logs")
+        self.parser.set_defaults(analysis = Log)
+        self.parser_input.add_argument("-start_time", type = float, required = False,
+          help = "Desired time of first frame (optional)")
+
+    def check(self, infiles, h5_file, destination, frames_per_file = None, force = False, *args, **kwargs):
+        """
+        Determines whether or not to run analysis
+
+        **Arguments:**
+            :*infiles*:         Text infiles
+            :*h5_file*:         Target h5 file
+            :*destination*:     Intended location of new dataset within h5 file
+            :*frames_per_file*: Number of frames of data in each infile (optional)
+            :*force*:           Force analysis to run even if data already present
+
+        **Returns:**
+            :*run*:             True if analysis should be run, false otherwise
+
+        .. todo:
+            - Implement
+        """
+        return True
+
+    def run(self, infiles, destination, start_time = 0.001, *args, **kwargs):
+        """
+        Runs analysis and returns new datasets
+
+        **Arguments:**
+            :*infiles*:     Text infile(s)
+            :*destination*: Destination of dataset within h5 file
+            :*start_time*:  Time of first frame (optional)
+
+        **Returns:**
+            :*new_data*:    List of tuples of new data in form of [(path1, dataset1), (path2, dataset2), ...]
+        """
+
+        # Load raw data from each infile
+        data = {}
+        for infile in infiles:
+            with open(infile, "r") as infile:
+                raw = [line.strip() for line in infile.readlines()]
+            if not raw[-1].startswith("|  Master Total wall time:"):
+                break
+            i = 0
+            while i < len(raw):
                 line    = raw[i]
-                if line.startswith("------------------------------------------------------------------------------"):
+                if   line.startswith("A V E R A G E S"):
                     break
-                line    = line.split("=")
-                for j in range(1,len(line)):
-                    if j == 1:                  field   = line[j-1].strip()
-                    else:
-                        field                           = line[j-1].split()
-                        if len(field)   == 1:   field   = field[0]
-                        else:                   field   = " ".join(field[1:])
-                    value   = float(line[j].split()[0])
-                    if field in data:   data[field]    += [value]
-                    else:               data[field]     = [value]
-                i      += 1
-        i  += 1
-    data["TIME(PS)"]    = np.array(data["TIME(PS)"])  / 1000. + time_offset
-    dtype_line      = "np.dtype([('time', 'f4'),"
-    log_line        = "[tuple(frame) for frame in np.column_stack((data['TIME(PS)'],"
-    attrs_line      = "{'time units': 'ns',"
-    for field, dest in [("Etot",        "total"),
-                        ("EPtot",       "potential"),
-                        ("EKtot",       "kinetic"),
-                        ("BOND",        "bond"),
-                        ("ANGLE",       "angle"),
-                        ("DIHED",       "dihedral"),
-                        ("EELEC",       "coulomb"),
-                        ("1-4 EEL",     "coulomb 1-4"),
-                        ("VDWAALS",     "van der Waals"),
-                        ("1-4 NB",      "van der Waals 1-4"),
-                        ("EHBOND",      "hydrogen bond"),
-                        ("RESTRAINT",   "position restraint"),
-                        ("EKCMT",       "center of mass motion kinetic"),
-                        ("VIRIAL",      "virial"),
-                        ("EPOLZ",       "polarization")]:
-        if not (field in data): continue
-        data[field]     = np.array(data[field])
-        dtype_line     += "('"     + dest  + "', 'f4'),"
-        log_line       += "data['" + field + "'],"
-        attrs_line     += "'"      + dest  + " units': 'kcal mol-1',"
-    if "TEMP(K)" in data:
-        data["TEMP(K)"] = np.array(data["TEMP(K)"])
-        dtype_line     += "('temperature', 'f4'),"
-        log_line       += "data['TEMP(K)'],"
-        attrs_line     += "'temperature units': 'K',"
-    if "PRESS" in data:
-        data["PRESS"]   = np.array(data["PRESS"])
-        dtype_line     += "('pressure', 'f4'),"
-        log_line       += "data['PRESS'],"
-        attrs_line     += "'pressure units': 'bar',"
-    if "Dipole convergence: rms" in data:
-        data["Dipole convergence: rms"] = np.array(data["Dipole convergence: rms"])
-        dtype_line     += "('dipole converge rms', 'f4'),"
-        log_line       += "data['Dipole convergence: rms'],"
-    if "iters" in data:
-        data["iters"]   = np.array(data["iters"])
-        dtype_line     += "('iters', 'f4'),"
-        log_line       += "data['iters'],"
-    dtype_line  = dtype_line[:-1]   + "])"
-    log_line    = log_line[:-1]     + "))]"
-    attrs_line  = attrs_line[:-1]   + "}"
-    log         = np.array(eval(log_line), eval(dtype_line))
-    log_attrs   = eval(attrs_line)
-    return [(segment + "/log",    log),
-            (segment + "/",       seg_attrs),
-            (segment + "/log",    log_attrs)]
-def _check_log(hdf5_file, segment, require_trajectory_files = False, force = False, **kwargs):
-    if      (require_trajectory_files
-    and not (segment.topology   and os.path.isfile(segment.topology)
-    and      segment.trajectory and os.path.isfile(segment.trajectory))):
-            return False
-    if    (force
-    or not segment + "/log" in hdf5_file): return [(log, segment, kwargs)]
-    else:                                  return False
+                elif line.startswith("NSTEP"):
+                    while True:
+                        line = raw[i]
+                        if line.startswith("------------------------------------------------------------------------------"):
+                            break
+                        else:
+                            line = line.split("=")
+                            for j in range(1, len(line)):
+                                if j == 1:            key = line[j-1].strip()
+                                else:
+                                    key                   = line[j-1].split()
+                                    if len(key) == 1: key = key[0]
+                                    else:             key = " ".join(key[1:])
+                                value = float(line[j].split()[0])
+                                if key in data: data[key] += [value]
+                                else:           data[key]  = [value]
+                            i += 1
+                i += 1
+
+        # Format and return data
+        data["time"] = np.array(data["TIME(PS)"])  / 1000.
+        if start_time is not None:
+            data["time"] -= (data["time"][0] - start_time)
+        new_keys = ["time"]
+        dtype    = [("time", "f4")]
+        attrs    = {"time units": "ns"}
+        fields   = [("Etot",                    "total",                         "kcal mol-1"),
+                    ("EPtot",                   "potential",                     "kcal mol-1"),
+                    ("EKtot",                   "kinetic",                       "kcal mol-1"),
+                    ("BOND",                    "bond",                          "kcal mol-1"),
+                    ("ANGLE",                   "angle",                         "kcal mol-1"),
+                    ("DIHED",                   "dihedral",                      "kcal mol-1"),
+                    ("EELEC",                   "coulomb",                       "kcal mol-1"),
+                    ("1-4 EEL",                 "coulomb 1-4",                   "kcal mol-1"),
+                    ("VDWAALS",                 "van der Waals",                 "kcal mol-1"),
+                    ("1-4 NB",                  "van der Waals 1-4",             "kcal mol-1"),
+                    ("EHBOND",                  "hydrogen bond",                 "kcal mol-1"),
+                    ("RESTRAINT",               "position restraint",            "kcal mol-1"),
+                    ("EKCMT",                   "center of mass motion kinetic", "kcal mol-1"),
+                    ("VIRIAL",                  "virial",                        "kcal mol-1"),
+                    ("EPOLZ",                   "polarization",                  "kcal mol-1"),
+                    ("TEMP(K)",                 "temperature",                   "K"),
+                    ("PRESS",                   "pressure",                      "bar"),
+                    ("Dipole convergence: rms", "dipole convergence rms",        None),
+                    ("iters",                   "dipole convergence iterations", None)]
+        for raw_key, new_key, units in fields:
+            if raw_key in data:
+                data[new_key] = np.array(data[raw_key])
+                new_keys     += [new_key]
+                dtype        += [(new_key, "f4")]
+                if units is not None:
+                    attrs[new_key + " units"] = units
+        new_data = np.zeros(len(data["time"]), dtype)
+        for key in new_keys:
+            new_data[key] = data[key]
+        return [(destination, new_data)]
 
 
