@@ -1,6 +1,6 @@
 #!/usr/bin/python
 #   MDclt_primary.py
-#   Written by Karl Debiec on 14-06-30, last updated by Karl Debiec on 14-07-03
+#   Written by Karl Debiec on 14-06-30, last updated by Karl Debiec on 14-07-05
 """
 Command Line Tool to manage primary analysis of molecular dynamics simulations
 
@@ -31,9 +31,10 @@ if __name__ == "__main__":
     if kwargs["attrs"] is not None:
         attrs = reduce(operator.add, kwargs["attrs"])
         kwargs["attrs"] = {key: value for key, value in zip(*[iter(attrs)] * 2)}
+    else:
+        kwargs["attrs"] = {}
 
     # Run selected analysis
-    analysis = kwargs["analysis"]()
-    analysis.command_line(**kwargs)
+    analysis = kwargs.pop("analysis")(**kwargs)
 
 

@@ -1,6 +1,6 @@
 #!/usr/bin/python
 #   MDclt.primary.__init__.py
-#   Written by Karl Debiec on 14-06-30, last updated by Karl Debiec on 14-07-03
+#   Written by Karl Debiec on 14-06-30, last updated by Karl Debiec on 14-07-05
 """
 Classes and functions for primary analysis of molecular dynamics simulations
 """
@@ -15,93 +15,190 @@ class Primary_Analysis(object):
     analysis programs
 
     .. todo:
-        - Rethink structure of information sent to add(...), list of tuples too limited
-        - Should support receiving blocks of data rather than full datasets, as well as their position within the full
-          dataset
-        - Accept datasets and attrs at the same time
-        - Accept kwargs to send to create_dataset(...)
-        - Consider implementing generator version of check(...) (as a classmethod?) that yields blocks of analysis in
-          the form of additional Primary_Analysis subclass objects
-        - Analysis functions should be written to act on arbitrary number of infiles (i.e. write one function for serial
-          or parallel blocks)
-        - Need some more intelligent way of operating on h5 files to support use of multiple cores
-        - Primary_Analysis subclasses may yield new data as well as function to add new data; once a 'central' function
-          that is not tied to a particular Primary_Analysis object receives the data it adds it using the function
-        - Likely requires function to presize dataset in h5 file, run before 
+        - Add multiprocessing support to Primary_Analysis.command_line(...) using Pool (-np argument)
+        - Support alternatives to -infiles, such as specifying a path and function to list segments
     """
 
     @classmethod
-    def add_parser(self, subparsers, *args, **kwargs):
+    def add_parser(cls, subparsers, *args, **kwargs):
         """
-        Adds subparser arguments and argument groups to an argument parser
+        Adds subparser for this analysis to a nascent argument parser
 
         **Arguments:**
-            :*subparsers*: argparse subparsers object to add subparser
-            :*args*:       Passed to subparsers.add_parser(...)
-            :*kwargs*:     Passed to subparsers.add_parser(...)
-
-        .. todo:
-            - Should -attrs be moved to subclasses? May not always be clear where these attrs should go
+            :*subparsers*: <argparse._SubParsersAction> to which to add
+            :*\*args*:     Passed to *subparsers*.add_parser(...)
+            :*\*\*kwargs*: Passed to *subparsers*.add_parser(...)
         """
-        self.parser = subparsers.add_parser(*args, **kwargs)
+        subparser = subparsers.add_parser(*args, **kwargs)
+        arg_groups = {"input":  subparser.add_argument_group("input"),
+                      "action": subparser.add_argument_group("action"),
+                      "output": subparser.add_argument_group("output")}
 
-        self.parser_input = self.parser.add_argument_group("input")
-        self.parser_input.add_argument("-infiles", type = str, required = True, action = "append", nargs = "*",
+        arg_groups["input"].add_argument("-infiles", type = str, required = True, action = "append", nargs = "*",
           help = "Input filenames")
-
-        self.parser_action = self.parser.add_argument_group("action")
-
-        self.parser_output = self.parser.add_argument_group("output")
-        self.parser_output.add_argument("-h5_file", type = str, required = True,
+        arg_groups["action"].add_argument("-n_cores", type = int, required = False, default = 1,
+          help = "Number of cores on which to carry out analysis")
+        arg_groups["output"].add_argument("-h5_file", type = str, required = True,
           help = "H5 file in which to output data")
-        self.parser_output.add_argument("-destination", type = str, required = True,
+        arg_groups["output"].add_argument("-address", type = str, required = True,
           help = "Location of dataset within h5 file")
-        self.parser_output.add_argument("-attrs", type = str, required = False, action = "append", nargs = "*",
+        arg_groups["output"].add_argument("-attrs", type = str, required = False, action = "append", nargs = "*",
           metavar = "KEY VALUE", 
           help = "Attributes to add to dataset")
-        self.parser_output.add_argument("--force", action = "store_true",
+        arg_groups["output"].add_argument("--force", action = "store_true",
           help = "Overwrite data if already present")
 
-    def command_line(self, *args, **kwargs):
+        return subparser
+
+    @classmethod
+    def command_line(cls, h5_file, n_cores, **kwargs):
         """
         Provides basic command line functionality
-        """
-        if self.check(*args, **kwargs):
-            new_data = self.run(*args,   **kwargs)
-            self.add(new_data = new_data, *args,   **kwargs)
 
-    def check(self, *args, **kwargs):
+        **Arguments:**
+            :*cls*:     Class whose block_generator(...) and block_storer(...) will be used
+            :*h5_file*: Filename of h5 file in which data will be stored
         """
-        Determines whether or not to run analysis
-        """
-        return True
+        from multiprocessing import Pool
 
-    def run(self, *args, **kwargs):
-        """
-        Runs analysis and returns new datasets
-        """
-        return []
+        block_generator = cls.block_generator(h5_file = h5_file, **kwargs)
+        block_storer    = cls.block_storer(h5_file, **kwargs)
+        block_storer.next()
+        pool            = Pool(n_cores)
 
-    def add(self, h5_file, new_data, attrs = {}, *args, **kwargs):
+        for block in pool.imap_unordered(pool_director, block_generator):
+            block_storer.send(block)
+
+        pool.close()
+        pool.join()
+        block_storer.close()
+
+    class block_generator(object):
         """
-        Adds new datasets and attributes to h5 file
+        Base generator class that yields blocks of analysis
+
+        This is a class rather than a function, because it needs to perform initialization before the first call to
+        next().
+        """
+
+        def __init__(self, **kwargs):
+            """
+            Initialize generator; typically, this function will look at input data and output h5 file and perform any
+            necessary preparation.
+            """
+            raise NotImplementedError("'block_generator' class is not implemented")
+
+        def __iter__(self):
+            """
+            Allow class to act as a generator
+            """
+            return self
+
+        def _initialize(self, h5_file, address, dataset_kwargs = dict(chunks = True, compression = "gzip"), attrs = {},
+            force = False, **kwargs):
+            """
+            Components of __init__ shared by subclasses
+
+            **Arguments:**
+                :*h5_file*:         Filename of h5 file in which data will be stored
+                :*address*:         Address of dataset within h5 file
+                :*dataset_kwargs*:  Keyword arguments to be passed to create_dataset(...)
+                :*attrs*:           Attributes to be added to dataset
+                :*force*:           Run analysis even if all data is already present
+
+            .. todo:
+                - Make more general
+                - Support multiple datasets with multiple addresses, probably using syntax similar to block_storer
+                - Allow specification of where attrs should be stored
+            """
+            import h5py
+
+            with h5py.File(h5_file) as h5_file:
+                if address in h5_file:
+                    if force:
+                        del h5_file[address]
+                        h5_file.create_dataset(address, data = np.empty(self.expected_shape, self.dtype),
+                          **dataset_kwargs)
+                    else:
+                        dataset       = h5_file[address]
+                        current_shape = dataset.shape
+                        if self.expected_shape != current_shape:
+                            dataset.resize(size = self.expected_shape)
+                            self.infiles        = self.infiles[int(current_shape[0] / self.frames_per_file):]
+                            self.current_index  = current_shape[0]
+                        else:
+                            self.infiles = []
+                else:
+                    h5_file.create_dataset(address, data = np.empty(self.expected_shape, self.dtype),
+                      **dataset_kwargs)
+                for key, value in attrs.items():
+                    h5_file[self.address].attrs[key] = value
+
+        def next(self):
+            """
+            Prepares and yields next block of analysis
+            """
+            raise NotImplementedError("'block_generator' class is not implemented")
+
+    @classmethod
+    def block_storer(cls, h5_file, **kwargs):
+        """
+        Coroutine that accepts analysis blocks and stores their associated datasets in h5
+
+        **Arguments:**
+            :*h5_file*: Filename of h5 file in which data will be stored
 
         .. todo:
-            - Support better handling of attributes
+            - Decorate to hide call to block_storer.next()?
+            - Support different levels of verbosity
+              (i.e. 'Dataset ... was extended from ... to ...')
         """
-        import types
         import h5py
 
         with h5py.File(h5_file) as h5_file:
-            for destination, dataset in new_data:
-                if (destination in dict(h5_file)):
-                    del h5_file[destination]
-                new_dataset = h5_file.create_dataset(name = destination, data = dataset,
-                            dtype = dataset.dtype, compression = "lzf")
-                print("Dataset '{0}' of shape '{1}' added to {2}".format(destination, new_dataset.shape,
-                  h5_file.filename))
-            if attrs is not None:
-                for key, value in attrs.items():
-                    new_dataset.attrs[key] = value
+            try:
+                while(True):
+                    block = yield
+                    for dataset in block.datasets:
+                        if "slc" in dataset:
+                            h5_file[dataset["address"]][dataset["slc"]] = dataset["data"]
+                            print("Dataset stored at {0}[{1}][{2}:{3}]".format(h5_file.filename,
+                              dataset["address"], dataset["slc"].start, dataset["slc"].stop))
+                        else:
+                            h5_file[dataset["address"]]                 = dataset["data"]
+                            print("Dataset stored at {0}[{1}]".format(h5_file.filename,
+                              dataset["address"]))
+                        if "attrs" in dataset:
+                            for key, value in dataset["attrs"].items():
+                                h5_file[dataset["address"]].attrs[key] = value
+            except GeneratorExit:
+                # Appears necessary to properly __exit__ h5 file
+                pass
+
+    def __init__(self, *args, **kwargs):
+        """
+        Initializes a block of analysis
+        """
+        # Appears necessary to allow subclasses of subclasses of this class to pass *args, **kwargs to the __init__
+        #   methods of the intermediate superclasses.
+        pass
+
+    def analyze(self, **kwargs):
+        """
+        Runs this block of analysis; stores resulting data in an instance variable
+        """
+        raise NotImplementedError("'analyze' function of '{0}' is not implemented".format(self.__class__.__name__))
+
+###################################################### FUNCTIONS #######################################################
+def pool_director(block):
+    """
+    Allows multiprocessing.Pool(...) to run a block of analysis
+
+    .. todo:
+        - multiprocessing.Pool(...) only supports module-level classes; implement alternative method using lower-level
+          components of multiprocessing to allow cleaner design
+    """
+    block.analyze()
+    return block
 
 
