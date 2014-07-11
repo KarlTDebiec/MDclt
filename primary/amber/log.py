@@ -125,25 +125,27 @@ class Block_Generator(primary.Block_Generator):
     Generator class that yields blocks of analysis
     """
 
-    fields = [("Etot",                    "total",                         "kcal mol-1"),
-              ("EPtot",                   "potential",                     "kcal mol-1"),
-              ("EKtot",                   "kinetic",                       "kcal mol-1"),
-              ("BOND",                    "bond",                          "kcal mol-1"),
-              ("ANGLE",                   "angle",                         "kcal mol-1"),
-              ("DIHED",                   "dihedral",                      "kcal mol-1"),
-              ("EELEC",                   "coulomb",                       "kcal mol-1"),
-              ("1-4 EEL",                 "coulomb 1-4",                   "kcal mol-1"),
-              ("VDWAALS",                 "van der Waals",                 "kcal mol-1"),
-              ("1-4 NB",                  "van der Waals 1-4",             "kcal mol-1"),
-              ("EHBOND",                  "hydrogen bond",                 "kcal mol-1"),
-              ("RESTRAINT",               "position restraint",            "kcal mol-1"),
-              ("EKCMT",                   "center of mass motion kinetic", "kcal mol-1"),
-              ("VIRIAL",                  "virial",                        "kcal mol-1"),
-              ("EPOLZ",                   "polarization",                  "kcal mol-1"),
-              ("TEMP(K)",                 "temperature",                   "K"),
-              ("PRESS",                   "pressure",                      "bar"),
-              ("Dipole convergence: rms", "dipole convergence rms",        None),
-              ("iters",                   "dipole convergence iterations", None)]
+    fields = [("Etot",                    "total energy",                         "kcal mol-1"),
+              ("EPtot",                   "potential energy",                     "kcal mol-1"),
+              ("EKtot",                   "kinetic energy",                       "kcal mol-1"),
+              ("BOND",                    "bond energy",                          "kcal mol-1"),
+              ("ANGLE",                   "angle energy",                         "kcal mol-1"),
+              ("DIHED",                   "dihedral energy",                      "kcal mol-1"),
+              ("EELEC",                   "coulomb energy",                       "kcal mol-1"),
+              ("1-4 EEL",                 "coulomb 1-4 energy",                   "kcal mol-1"),
+              ("VDWAALS",                 "van der Waals energy",                 "kcal mol-1"),
+              ("1-4 NB",                  "van der Waals 1-4 energy",             "kcal mol-1"),
+              ("EHBOND",                  "hydrogen bond energy",                 "kcal mol-1"),
+              ("RESTRAINT",               "position restraint energy",            "kcal mol-1"),
+              ("EKCMT",                   "center of mass motion kinetic energy", "kcal mol-1"),
+              ("VIRIAL",                  "virial energy",                        "kcal mol-1"),
+              ("EPOLZ",                   "polarization energy",                  "kcal mol-1"),
+              ("TEMP(K)",                 "temperature energy",                   "K"),
+              ("PRESS",                   "pressure",                             "bar"),
+              ("VOLUME",                  "volume",                               "A3"),
+              ("Density",                 "density",                              "g/cm3"),
+              ("Dipole convergence: rms", "dipole convergence rms",               None),
+              ("iters",                   "dipole convergence iterations",        None)]
 
     def __init__(self, output, infiles, frames_per_file = None, **kwargs):
         """
@@ -265,5 +267,6 @@ class Block_Generator(primary.Block_Generator):
             result  = process.stdout.read()
         if not result.startswith("|  Total wall time:"):
             self.infiles.pop(-1)
+            self.expected_shape[0] -= self.frames_per_file
 
 

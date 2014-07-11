@@ -20,9 +20,9 @@ if __name__ == "__main__":
     subparsers = parser.add_subparsers(dest = "package", description = "")
 
     from MDclt.secondary import pmf
-#    from MDclt.secondary.association import Association
+    from MDclt.secondary import association
     pmf.add_parser(subparsers)
-#    Association.add_parser(subparsers)
+    association.add_parser(subparsers)
 
     # Parse arguments
     kwargs = vars(parser.parse_args())

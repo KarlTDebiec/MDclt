@@ -2,7 +2,7 @@
 #   MDclt.secondary.Pmf.py
 #   Written by Karl Debiec on 12-08-15, last updated by Karl Debiec on 14-07-10
 """
-Class for calculation of potential of mean force
+Classes for calculation of potential of mean force
 
 .. todo:
     - Support bin expressions in the same variety of forms that WESTPA does
@@ -111,7 +111,7 @@ class Block_Generator(Block_Generator):
             :*log*:    Simulation log
             :*coord*:  Coordinates used to generate pmf
             :*output*: List including path to h5 file and address within h5 file
-            :*log*:    List of infiles
+            :*bins*:   Bins in which to classify coordinates
             :*force*:  Run analysis even if no new data is present
         """
         import warnings
@@ -210,7 +210,6 @@ class Block_Accumulator(Block_Accumulator):
         """
         while True:
             block = (yield)
-            print(block.datasets[0]["slc"])
             self.datasets[0]["data"]["count"] += block.datasets[0]["data"]
 
     def close(self, *args, **kwargs):
