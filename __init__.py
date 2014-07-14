@@ -7,22 +7,24 @@ Command line tools for analysis of molecular dynamics simulations
 .. todo:
     - Documentation
 """
-####################################################### MODULES ########################################################
+################################### MODULES ####################################
 from __future__ import division, print_function
 import os, sys
 import numpy as np
-###################################################### FUNCTIONS #######################################################
+################################## FUNCTIONS ###################################
 def pool_director(block):
     """
-    Allows multiprocessing.Pool(...) to run blocks of analysis obtained from an iterator
+    Allows multiprocessing.Pool(...) to run blocks of analysis obtained from an
+    iterator
 
     .. todo:
-        - multiprocessing.Pool(...) only supports module-level classes; implement alternative method using lower-level
-          components of multiprocessing to allow cleaner design
+        - multiprocessing.Pool(...) only supports module-level classes;
+          implement alternative method using lower-level components of
+          multiprocessing to allow cleaner design
     """
     block()
     return block
-####################################################### CLASSES ########################################################
+################################### CLASSES ####################################
 class Block(object):
     """
     Independent block of analysis
@@ -63,8 +65,8 @@ class Block_Generator(object):
 
 class Block_Accumulator(object):
     """
-    Coroutine class used to accumulate Blocks of data and perform analysis once the complete data is present;
-    Also may act as a Block itself
+    Coroutine class used to accumulate Blocks of data and perform analysis once
+    the complete data is present; also may act as a Block itself
     """
     def __init__(self, **kwargs):
         """
@@ -140,13 +142,14 @@ class Block_Acceptor(object):
                         if "slc" in dataset:
                             slc = dataset["slc"]
                             out_h5[address][slc] = data
-                            print("Dataset stored at {0}[{1}][{2}:{3}]".format(out_h5.filename, address, slc.start,
-                              slc.stop))
+                            print("Dataset stored at {0}[{1}][{2}:{3}]".format(
+                              out_h5.filename, address, slc.start, slc.stop))
                         else:
                             if address in out_h5:
                                 del out_h5[address]
                             out_h5[address] = data
-                            print("Dataset stored at {0}[{1}]".format(out_h5.filename, address))
+                            print("Dataset stored at {0}[{1}]".format(
+                              out_h5.filename, address))
                         if "attrs" in dataset:
                             attrs = dataset["attrs"]
                             for key, value in attrs.items():

@@ -7,13 +7,13 @@ Classes for transfer of AMBER simulation logs to h5
 .. todo:
     - Better support appending data rather than reloading complete dataset
 """
-####################################################### MODULES ########################################################
+################################### MODULES ####################################
 from __future__ import division, print_function
 import os, sys
 import numpy as np
 from MDclt import primary
 from MDclt import Block, Block_Acceptor
-###################################################### FUNCTIONS #######################################################
+################################## FUNCTIONS ###################################
 def add_parser(subparsers, *args, **kwargs):
     """
     Adds subparser for this analysis to a nascent argument parser
@@ -26,13 +26,23 @@ def add_parser(subparsers, *args, **kwargs):
     .. todo:
         - Implement nested subparser (should be 'amber log', not just 'log')
     """
-    subparser = primary.add_parser(subparsers, name = "log",
-      help = "Load AMBER logs")
+    subparser  = primary.add_parser(subparsers,
+      name     = "log",
+      help     = "Load AMBER logs")
     arg_groups = {ag.title:ag for ag in subparser._action_groups}
-    arg_groups["input"].add_argument("-frames_per_file", type = int, required = False,
-      help = "Number of frames in each file; used to check if new data is present (optional)")
-    arg_groups["input"].add_argument("-start_time", type = float, required = False,
-      help = "Time of first frame (ns) (optional)")
+
+    arg_groups["input"].add_argument(
+      "-frames_per_file",
+      type     = int,
+      required = False,
+      help     = "Number of frames in each file; used to check if new data " +
+                 "is present (optional)")
+    arg_groups["input"].add_argument(
+      "-start_time",
+      type     = float,
+      required = False,
+      help     = "Time of first frame (ns) (optional)")
+
     subparser.set_defaults(analysis = command_line)
 
 def command_line(n_cores = 1, **kwargs):
@@ -61,12 +71,13 @@ def command_line(n_cores = 1, **kwargs):
     block_acceptor.close()
 
 
-####################################################### CLASSES ########################################################
+################################### CLASSES ####################################
 class Block(Block):
     """
     Independent block of analysis
     """
-    def __init__(self, infiles, raw_keys, new_keys, dtype, address, slc, time_offset = 0, *args, **kwargs):
+    def __init__(self, infiles, raw_keys, new_keys, dtype, address, slc,
+                 time_offset = 0, *args, **kwargs):
         """
         Initializes block of analysis
 
@@ -76,7 +87,8 @@ class Block(Block):
             :*new_keys*:    Desired names of fields in nascent dataset
             :*dtype*:       Data type of nascent dataset
             :*address*:     Address of dataset within h5 file
-            :*slc*:         Slice within dataset at which this block will be stored
+            :*slc*:         Slice within dataset at which this block
+                            will be stored
             :*time_offset*: Offset by which to adjust simulation time
         """
         super(Block, self).__init__(*args, **kwargs)
@@ -116,7 +128,8 @@ class Block(Block):
                 i += 1
 
         # Copy from raw_data to new_data
-        self.datasets[0]["data"]["time"] = (np.array(raw_data["TIME(PS)"], np.float) / 1000) + self.time_offset
+        self.datasets[0]["data"]["time"] = (np.array(raw_data["TIME(PS)"],
+          np.float) / 1000) + self.time_offset
         for raw_key, new_key in zip(self.raw_keys[1:], self.new_keys[1:]):
             self.datasets[0]["data"][new_key] = np.array(raw_data[raw_key])
 
@@ -125,40 +138,46 @@ class Block_Generator(primary.Block_Generator):
     Generator class that yields blocks of analysis
     """
 
-    fields = [("Etot",                    "total energy",                         "kcal mol-1"),
-              ("EPtot",                   "potential energy",                     "kcal mol-1"),
-              ("EKtot",                   "kinetic energy",                       "kcal mol-1"),
-              ("BOND",                    "bond energy",                          "kcal mol-1"),
-              ("ANGLE",                   "angle energy",                         "kcal mol-1"),
-              ("DIHED",                   "dihedral energy",                      "kcal mol-1"),
-              ("EELEC",                   "coulomb energy",                       "kcal mol-1"),
-              ("1-4 EEL",                 "coulomb 1-4 energy",                   "kcal mol-1"),
-              ("VDWAALS",                 "van der Waals energy",                 "kcal mol-1"),
-              ("1-4 NB",                  "van der Waals 1-4 energy",             "kcal mol-1"),
-              ("EHBOND",                  "hydrogen bond energy",                 "kcal mol-1"),
-              ("RESTRAINT",               "position restraint energy",            "kcal mol-1"),
-              ("EKCMT",                   "center of mass motion kinetic energy", "kcal mol-1"),
-              ("VIRIAL",                  "virial energy",                        "kcal mol-1"),
-              ("EPOLZ",                   "polarization energy",                  "kcal mol-1"),
-              ("TEMP(K)",                 "temperature energy",                   "K"),
-              ("PRESS",                   "pressure",                             "bar"),
-              ("VOLUME",                  "volume",                               "A3"),
-              ("Density",                 "density",                              "g/cm3"),
-              ("Dipole convergence: rms", "dipole convergence rms",               None),
-              ("iters",                   "dipole convergence iterations",        None)]
+    fields = [("TIME(PS)",  "time",                      "ns"),
+              ("Etot",      "total energy",              "kcal mol-1"),
+              ("EPtot",     "potential energy",          "kcal mol-1"),
+              ("EKtot",     "kinetic energy",            "kcal mol-1"),
+              ("BOND",      "bond energy",               "kcal mol-1"),
+              ("ANGLE",     "angle energy",              "kcal mol-1"),
+              ("DIHED",     "dihedral energy",           "kcal mol-1"),
+              ("EELEC",     "coulomb energy",            "kcal mol-1"),
+              ("1-4 EEL",   "coulomb 1-4 energy",        "kcal mol-1"),
+              ("VDWAALS",   "van der Waals energy",      "kcal mol-1"),
+              ("1-4 NB",    "van der Waals 1-4 energy",  "kcal mol-1"),
+              ("EHBOND",    "hydrogen bond energy",      "kcal mol-1"),
+              ("RESTRAINT", "position restraint energy", "kcal mol-1"),
+              ("EKCMT",     "center of mass motion kinetic energy",
+                                                         "kcal mol-1"),
+              ("VIRIAL",    "virial energy",             "kcal mol-1"),
+              ("EPOLZ",     "polarization energy",       "kcal mol-1"),
+              ("TEMP(K)",   "temperature energy",        "K"),
+              ("PRESS",     "pressure",                  "bar"),
+              ("VOLUME",    "volume",                    "A3"),
+              ("Density",   "density",                   "g/cm3"),
+              ("Dipole convergence: rms",
+                            "dipole convergence rms",    None),
+              ("iters",     "dipole convergence iterations",
+                                                         None)]
 
     def __init__(self, output, infiles, frames_per_file = None, **kwargs):
         """
         Initializes generator
 
         **Arguments:**
-            :*output*:          List including path to h5 file and address within h5 file
+            :*output*:          List including path to h5 file and
+                                address within h5 file
             :*infiles*:         List of infiles
-            :*frames_per_file*: Number of frames in each infile (optional)
+            :*frames_per_file*: Number of frames in each infile
+                                (optional)
 
         .. todo:
-            - Intelligently break lists of infiles into blocks larger than 1
-            - If data is being appended, do not determine dtype again
+            - Intelligently break lists of infiles into blocks larger
+              than 1
         """
 
         # Store necessary information in instance variables
@@ -173,14 +192,16 @@ class Block_Generator(primary.Block_Generator):
         self.get_time_offset(**kwargs)
 
         # Determine structure of input data
-        self.get_dataset_format(**kwargs)
+        self.get_dataset_format(output = output, **kwargs)
 
         # Disregard last infile, if applicable
         self.cut_incomplete_infiles(**kwargs)
 
         # Complete initialization 
-        dataset_kwargs = dict(chunks = True, compression = "gzip", maxshape = [None])
-        super(Block_Generator, self).__init__(output = output, dataset_kwargs = dataset_kwargs, **kwargs)
+        dataset_kwargs = dict(chunks = True, compression = "gzip",
+          maxshape = [None])
+        super(Block_Generator, self).__init__(output = output,
+          dataset_kwargs = dataset_kwargs, **kwargs)
 
     def next(self):
         """
@@ -213,47 +234,66 @@ class Block_Generator(primary.Block_Generator):
             self.time_offset = 0
         else:
             with open(os.devnull, "w") as fnull:
-                command = "cat {0} | grep -m 1 'TIME(PS)' | awk '{{print $6}}'".format(self.infiles[0])
-                process = subprocess.Popen(command, stdout = subprocess.PIPE, stderr = fnull, shell = True)
+                command = "cat {0} | ".format(self.infiles[0]) + \
+                          "grep -m 1 'TIME(PS)' | " + \
+                          "awk '{{print $6}}'"
+                process = subprocess.Popen(command,
+                            stdout = subprocess.PIPE,
+                            stderr = fnull,
+                            shell  = True)
                 result  = process.stdout.read()
-            self.time_offset = float(result) / - 1000 + start_time
+            self.time_offset = float(result) / -1000 + start_time
 
-    def get_dataset_format(self, **kwargs):
+    def get_dataset_format(self, output, **kwargs):
         """
         Determines format of dataset
         """
+        from h5py import File as h5
 
-        # Determine fields present in infile
-        raw_keys = []
-        breaking = False
-        with open(self.infiles[0], "r") as infile:
-            raw_text = [line.strip() for line in infile.readlines()]
-        for i in xrange(len(raw_text)):
-            if breaking:  break
-            if raw_text[i].startswith("NSTEP"):
-                while True:
-                    if raw_text[i].startswith("----------"):
-                        breaking = True
-                        break
-                    for j, field in enumerate(raw_text[i].split("=")[:-1]):
-                        if j == 0:
-                            raw_keys += [field.strip()]
-                        else:
-                            raw_keys += [" ".join(field.split()[1:])]
-                    i += 1
+        out_path, out_address = output
 
-        # Determine appropriate dtype of new data
-        self.raw_keys = ["TIME(PS)"]
-        self.new_keys = ["time"]
-        self.dtype    = [("time", "f4")]
-        self.attrs    = {"time units": "ns"}
-        for raw_key, new_key, units in self.fields:
-            if raw_key in raw_keys:
-                self.raw_keys  += [raw_key]
-                self.new_keys  += [new_key]
-                self.dtype     += [(new_key, "f4")]
-                if units is not None:
-                    self.attrs[new_key + " units"] = units
+        with h5(out_path) as out_h5:
+            if out_address in out_h5:
+                # If dataset already exists, extract current dtype
+                self.dtype    = out_h5[out_address].dtype
+                self.new_keys = list(self.dtype.names)
+                self.raw_keys = []
+                for key in self.new_keys:
+                    self.raw_keys += [r for r, n, _ in self.fields if n == key]
+                self.attrs    = dict(out_h5[out_address].attrs)
+            else:
+                # Otherwise, determine fields present in infile
+                raw_keys = []
+                breaking = False
+                with open(self.infiles[0], "r") as infile:
+                    raw_text = [line.strip() for line in infile.readlines()]
+                for i in xrange(len(raw_text)):
+                    if breaking:  break
+                    if raw_text[i].startswith("NSTEP"):
+                        while True:
+                            if raw_text[i].startswith("----------"):
+                                breaking = True
+                                break
+                            for j, field in enumerate(
+                              raw_text[i].split("=")[:-1]):
+                                if j == 0:
+                                    raw_keys += [field.strip()]
+                                else:
+                                    raw_keys += [" ".join(field.split()[1:])]
+                            i += 1
+
+                # Determine appropriate dtype of new data
+                self.raw_keys = ["TIME(PS)"]
+                self.new_keys = ["time"]
+                self.dtype    = [("time", "f4")]
+                self.attrs    = {"time units": "ns"}
+                for raw_key, new_key, units in self.fields[1:]:
+                    if raw_key in raw_keys:
+                        self.raw_keys  += [raw_key]
+                        self.new_keys  += [new_key]
+                        self.dtype     += [(new_key, "f4")]
+                        if units is not None:
+                            self.attrs[new_key + " units"] = units
 
     def cut_incomplete_infiles(self, **kwargs):
         """
@@ -263,9 +303,13 @@ class Block_Generator(primary.Block_Generator):
 
         with open(os.devnull, "w") as fnull:
             command = "tail -n 1 {0}".format(self.infiles[-1])
-            process = subprocess.Popen(command, stdout = subprocess.PIPE, stderr = fnull, shell = True)
+            process = subprocess.Popen(command,
+                        stdout = subprocess.PIPE,
+                        stderr = fnull,
+                        shell  = True)
             result  = process.stdout.read()
-        if not result.startswith("|  Total wall time:"):
+        if not (result.startswith("|  Total wall time:")          # pmemd.cuda
+           or   result.startswith("|  Master Total wall time:")): # pmemd
             self.infiles.pop(-1)
             self.expected_shape[0] -= self.frames_per_file
 
