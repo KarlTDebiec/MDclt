@@ -35,7 +35,7 @@ class Block(object):
         """
         pass
 
-    def analyze(self, **kwargs):
+    def __call__(self, **kwargs):
         """
         Runs this block of analysis
         """
@@ -73,7 +73,7 @@ class Block_Accumulator(object):
         """
         Initializes wrapped function
         """
-        pass
+        self.func = self.receive_block()
 
     def next(self, **kwargs):
         """
@@ -86,6 +86,33 @@ class Block_Accumulator(object):
         Transfers arguments to wrapped function
         """
         self.func.send(*args, **kwargs)
+
+    def receive_block(self, **kwargs):
+        """
+        Accumulates received Blocks
+        """
+        raise NotImplementedError(
+                "'Block_Accumulator' class is not implemented")
+
+    def receive_slice(self, slc, **kwargs):
+        """
+        Acknowleges a portion (slice) of the dataset to have been
+        received; maintains sorted array of received slices, and
+        merges adjacent slices as they are received.
+
+        **Arguments:**
+            :*slc*: Received slice
+        """
+        rs    = sorted(self.received_slices + [slc], key = lambda s: s.start)
+        max_i = len(rs) - 1
+        i     = 0
+        while i < max_i:
+            if rs[i].stop == rs[i+1].start:
+                rs    = rs[:i] + [slice(rs[i].start,rs[i+1].stop, 1)] + rs[i+2:]
+                max_i = len(rs) - 1
+                i    -= 1
+            i += 1
+        self.received_slices = rs
 
     def close(self, *args, **kwargs):
         """
@@ -93,37 +120,20 @@ class Block_Accumulator(object):
         """
         self.func.close(*args, **kwargs)
 
-class Block_Acceptor(object):
+class Block_Acceptor(Block_Accumulator):
     """
     Coroutine class used to store Blocks of data in an h5 file
     """
 
-    def __init__(self, **kwargs):
+    def __init__(self, *args, **kwargs):
         """
         Initializes wrapped function
         """
-        self.func     = self.store()
         self.out_path = kwargs.get("out_path", kwargs.pop("output")[0])
 
-    def next(self, **kwargs):
-        """
-        Moves wrapped function to first yield statement
-        """
-        self.func.next()
+        super(Block_Acceptor, self).__init__(*args, **kwargs)
 
-    def send(self, *args, **kwargs):
-        """
-        Transfers arguments to wrapped function
-        """
-        self.func.send(*args, **kwargs)
-
-    def close(self, *args, **kwargs):
-        """
-        Terminates wrapped function
-        """
-        self.func.close(*args, **kwargs)
-
-    def store(self, **kwargs):
+    def receive_block(self, **kwargs):
         """
         Stores data in an h5 file
 

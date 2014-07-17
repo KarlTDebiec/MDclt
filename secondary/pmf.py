@@ -1,6 +1,6 @@
 #!/usr/bin/python
 #   MDclt.secondary.Pmf.py
-#   Written by Karl Debiec on 12-08-15, last updated by Karl Debiec on 14-07-16
+#   Written by Karl Debiec on 12-08-15, last updated by Karl Debiec on 14-07-17
 """
 Classes for calculation of potential of mean force
 
@@ -15,7 +15,8 @@ Classes for calculation of potential of mean force
 import os, sys
 import numpy as np
 from MDclt import secondary
-from MDclt import Block, Block_Generator, Block_Accumulator, Block_Acceptor
+from MDclt.secondary import Block_Generator
+from MDclt import Block, Block_Accumulator, Block_Acceptor
 from MDclt import pool_director
 ################################## FUNCTIONS ###################################
 def add_parser(subparsers, *args, **kwargs):
@@ -77,17 +78,17 @@ def command_line(n_cores = 1, **kwargs):
                           **kwargs)
     block_accumulator.next()
 
-    # Parallel (processes)
-    pool              = Pool(n_cores)
-    for block in pool.imap_unordered(pool_director, block_generator):
-        block_accumulator.send(block)
-    pool.close()
-    pool.join()
-
     # Serial
     # for block in block_generator:
     #     block()
     #     block_accumulator.send(block)
+
+    # Parallel (processes)
+    pool = Pool(n_cores)
+    for block in pool.imap_unordered(pool_director, block_generator):
+        block_accumulator.send(block)
+    pool.close()
+    pool.join()
 
     block_accumulator.close()
 
@@ -101,7 +102,7 @@ class Block(Block):
     """
     Independent block of analysis
     """
-    def __init__(self, coord, bins, address, slc, attrs = {}, **kwargs):
+    def __init__(self, coord, bins, out_address, slc, attrs = {}, **kwargs):
         """
         Initializes block of analysis
 
@@ -114,24 +115,24 @@ class Block(Block):
         """
         from collections import OrderedDict
 
-        self.coord    = coord
-        self.bins     = bins
-        self.address  = address
-        self.datasets = OrderedDict({self.address:
-                          dict(slc = slc, attrs = attrs)})
+        self.coord       = coord
+        self.bins        = bins
+        self.out_address = out_address
+        self.datasets    = OrderedDict({out_address:
+                             dict(slc = slc, attrs = attrs)})
 
     def __call__(self, **kwargs):
         """
         Runs this block of analysis
         """
         hist, _ = np.histogram(self.coord, self.bins)
-        self.datasets[self.address]["count"] = hist
+        self.datasets[self.out_address]["count"] = hist
 
 class Block_Generator(Block_Generator):
     """
     Generator class that yields blocks of analysis
     """
-    def __init__(self, log, coord, output, bins, force = False, **kwargs):
+    def __init__(self, log, coord, output, bins, *args, **kwargs):
         """
         Initializes generator
 
@@ -142,52 +143,20 @@ class Block_Generator(Block_Generator):
             :*bins*:   Bins in which to classify coordinates
             :*force*:  Run analysis even if no new data is present
         """
-        from warnings import warn
-        from h5py import File as h5
 
-        # Unpack arguments
-        log_path,   log_address   = log
-        coord_path, coord_address = coord
-        out_path,   out_address   = output
+        # Input
+        self.log_path,   self.log_address   = log
+        self.coord_path, self.coord_address = coord
+        self.frames_per_block               = 10000
 
-        # Check input and output files
-        with h5(out_path)   as out_h5, \
-             h5(log_path)   as log_h5, \
-             h5(coord_path) as coord_h5:
+        # Action
+        self.bins = np.squeeze(np.array(eval(bins)))
 
-            # Determine final index from input datasets
-            log_shape    = log_h5[log_address].shape
-            coord_shape  = coord_h5[coord_address].shape
-            if log_shape[0] != coord_shape[0]:
-                warning  = "Length of log dataset ({0}) ".format(
-                             log_shape[0])
-                warning += "and coordinate dataset ({0}) ".format(
-                             coord_shape[0])
-                warning += "do not match, using smaller of the two"
-                warn(warning)
-            self.final_index = min(log_shape[0], coord_shape[0])
+        # Output
+        self.out_path, self.out_address = output
 
-            # Determine initial index from output dataset, if present
-            if force or not out_address in out_h5:
-                self.start_index       = 0
-                self.preexisting_slice = None
-            else:
-                dataset                = out_h5[out_address]
-                self.preexisting_slice = eval(dataset.attrs["slice"])
-                self.start_index       = self.preexisting_slice.stop
-
-            if self.start_index == self.final_index:
-                self.incoming_slice = None
-            else:
-                self.incoming_slice = slice(self.start_index,
-                                            self.final_index, 1)
-
-        # Store necessary data in instance variables
-        self.coord_path       = coord_path
-        self.coord_address    = coord_address
-        self.frames_per_block = 10000
-        self.bins             = np.squeeze(np.array(eval(bins)))
-        self.address          = out_address
+        super(Block_Generator, self).__init__(inputs = [log, coord],
+          output = output, *args, **kwargs)
 
     def next(self):
         """
@@ -212,10 +181,10 @@ class Block_Generator(Block_Generator):
             self.start_index += self.frames_per_block
 
             # Return new block
-            return Block(coord   = block_coord,
-                         bins    = self.bins,
-                         address = self.address,
-                         slc     = block_slice)
+            return Block(coord       = block_coord,
+                         bins        = self.bins,
+                         out_address = self.out_address,
+                         slc         = block_slice)
 
 class Block_Accumulator(Block_Accumulator):
     """
@@ -239,13 +208,13 @@ class Block_Accumulator(Block_Accumulator):
         from h5py import File as h5
         from collections import OrderedDict
 
+        super(Block_Accumulator, self).__init__(**kwargs)
         out_path, out_address = output
 
-        self.func              = self.accumulate()
         self.bins              = np.squeeze(np.array(eval(bins)))
         self.temperature       = temperature
         self.zero_point        = zero_point
-        self.address           = out_address
+        self.out_address       = out_address
         self.preexisting_slice = preexisting_slice
         self.incoming_slice    = incoming_slice
         self.received_slices   = []
@@ -270,38 +239,18 @@ class Block_Accumulator(Block_Accumulator):
             data["center"]      = (self.bins[:-1] + self.bins[1:]) / 2
             data["upper bound"] =  self.bins[1:]
 
-        self.datasets = OrderedDict({self.address:
+        self.datasets = OrderedDict({self.out_address:
                           dict(data = data, attrs = attrs)})
 
-    def receive_slice(self, slc, **kwargs):
-        """
-        Acknowleges a portion (slice) of the dataset to have been
-        received; maintains sorted array of received slices, and
-        merges adjacent slices as they are received.
-
-        **Arguments:**
-            :*slc*: Received slice
-        """
-        rs    = sorted(self.received_slices + [slc], key = lambda s: s.start)
-        max_i = len(rs) - 1
-        i     = 0
-        while i < max_i:
-            if rs[i].stop == rs[i+1].start:
-                rs    = rs[:i] + [slice(rs[i].start,rs[i+1].stop, 1)] + rs[i+2:]
-                max_i = len(rs) - 1
-                i    -= 1
-            i += 1
-        self.received_slices = rs
-
-    def accumulate(self, **kwargs):
+    def receive_block(self, **kwargs):
         """
         Accumulates received Blocks
         """
-        dataset = self.datasets[self.address]["data"]
+        dataset = self.datasets[self.out_address]["data"]
         while True:
             block = (yield)
-            dataset["count"] += block.datasets[self.address]["count"]
-            self.receive_slice(block.datasets[self.address]["slc"])
+            dataset["count"] += block.datasets[self.out_address]["count"]
+            self.receive_slice(block.datasets[self.out_address]["slc"])
             print(self.incoming_slice, self.received_slices)
 
     def close(self, *args, **kwargs):
@@ -311,8 +260,8 @@ class Block_Accumulator(Block_Accumulator):
         import types
 
         self.func.close(*args, **kwargs)
-        dataset = self.datasets[self.address]["data"]
-        attrs   = self.datasets[self.address]["attrs"]
+        dataset = self.datasets[self.out_address]["data"]
+        attrs   = self.datasets[self.out_address]["attrs"]
         if self.incoming_slice is None:
             self.datasets = {}
             return

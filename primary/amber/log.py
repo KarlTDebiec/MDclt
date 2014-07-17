@@ -67,7 +67,7 @@ def command_line(n_cores = 1, **kwargs):
     #     block()
     #     block_acceptor.send(block)
 
-    # Parallel
+    # Parallel (processes)
     pool = Pool(n_cores)
     for block in pool.imap_unordered(pool_director, block_generator):
         block_acceptor.send(block)

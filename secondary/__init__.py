@@ -8,6 +8,7 @@ Classes and functions for secondary analysis of molecular dynamics simulations
 from __future__ import division, print_function
 import os, sys
 import numpy as np
+from MDclt import Block_Generator, Block_Accumulator
 ################################## FUNCTIONS ###################################
 def add_parser(subparsers, *args, **kwargs):
     """
@@ -59,4 +60,42 @@ def add_parser(subparsers, *args, **kwargs):
 
     return subparser
 
+################################### CLASSES ####################################
+class Block_Generator(Block_Generator):
+    """
+    Generator class that yields blocks of analysis
+    """
+    def __init__(self, inputs, output, force = False, *args, **kwargs):
+        from warnings import warn
+        from h5py import File as h5
+
+        # Input
+        in_sizes = []
+        for in_path, in_address in inputs:
+            with h5(in_path) as in_h5:
+                in_sizes += [in_h5[in_address].shape[0]]
+        in_sizes = np.array(in_sizes)
+        if np.unique(np.array(in_sizes)).size != 1:
+            warn("Size of input datasets ({0}) inconsistent; ".format(
+              in_shapes) + "using smallest size")
+        self.final_index = np.min(in_sizes)
+
+        # Output
+        out_path, out_address = output
+        with h5(self.out_path) as out_h5:
+            if force or not out_address in out_h5:
+                self.start_index       = 0
+                self.preexisting_slice = None
+            else:
+                dataset                = out_h5[out_address]
+                self.preexisting_slice = eval(dataset.attrs["slice"])
+                self.start_index       = self.preexisting_slice.stop
+
+            if self.start_index == self.final_index:
+                self.incoming_slice = None
+            else:
+                self.incoming_slice = slice(self.start_index,
+                                            self.final_index, 1)
+
+        super(Block_Generator, self).__init__(force = force, *args, **kwargs)
 
