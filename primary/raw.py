@@ -1,6 +1,6 @@
 #!/usr/bin/python
 #   MDclt.primary.raw.py
-#   Written by Karl Debiec on 14-06-30, last updated by Karl Debiec on 14-07-16
+#   Written by Karl Debiec on 14-06-30, last updated by Karl Debiec on 14-07-17
 """
 Classes for transfer of data from raw text files to h5
 
@@ -59,15 +59,21 @@ def command_line(n_cores = 1, **kwargs):
     from MDclt import pool_director
 
     block_generator = Block_Generator(**kwargs)
-    block_acceptor  = Block_Acceptor(out_path = kwargs["output"][0], **kwargs)
+    block_acceptor  = Block_Acceptor(**kwargs)
     block_acceptor.next()
-    pool            = Pool(n_cores)
 
+    # Serial
+    # for block in block_generator:
+    #     block()
+    #     block_acceptor.send(block)
+
+    # Parallel
+    pool = Pool(n_cores)
     for block in pool.imap_unordered(pool_director, block_generator):
         block_acceptor.send(block)
-
     pool.close()
     pool.join()
+
     block_acceptor.close()
 
 ################################### CLASSES ####################################
@@ -75,7 +81,7 @@ class Block(Block):
     """
     Independent block of analysis
     """
-    def __init__(self, infiles, address, slc, dimensions = [], attrs = {},
+    def __init__(self, infiles, out_address, slc, dimensions = [], attrs = {},
                  *args, **kwargs):
         """
         Initializes block of analysis
@@ -92,26 +98,25 @@ class Block(Block):
         from collections import OrderedDict
 
         super(Block, self).__init__(*args, **kwargs)
+
         self.infiles     = infiles
         self.dimensions  = dimensions
-        self.address     = address
-        self.datasets    = OrderedDict({address:
-                             dict(slc = slc, attrs = attrs)})
+        self.out_address = out_address
+        self.datasets    = OrderedDict({out_address:
+                             dict(slc = slc,attrs = attrs)})
 
     def __call__(self, **kwargs):
         """
         Runs this block of analysis
         """
-        import subprocess
+        from subprocess import Popen, PIPE
 
-        # Load raw data into numpy using shell commands;
-        #   there may be a faster way to do this;
-        #   but this is at least faster than np.loadtxt(...)
-        #   for multiple files
+        # Load raw data into numpy using shell commands; there may be a faster
+        #   way to do this; but this seems faster than np.loadtxt()
+        #   followed by np.concanenate() for multiple files
         command     = "cat {0} | sed ':a;N;$!ba;s/\\n//g'".format(
                         " ".join(self.infiles))
-        process     = subprocess.Popen(command, stdout = subprocess.PIPE,
-                        shell = True)
+        process     = Popen(command, stdout = PIPE, shell = True)
         input_bytes = bytearray(process.stdout.read())
         dataset     = np.array(np.frombuffer(input_bytes, dtype = "S8",
                         count = int((len(input_bytes) -1) / 8)), np.float32)
@@ -124,18 +129,18 @@ class Block(Block):
 
         # Reshape if necessary
         if len(self.dimensions) != 0:
-            dataset = dataset.reshape([dataset.size 
-                        / np.product(self.dimensions)] + self.dimensions)
+            dataset = dataset.reshape(
+              [dataset.size / np.product(self.dimensions)] + self.dimensions)
 
         # Store in instance variable
-        self.datasets[self.address]["data"] = dataset
+        self.datasets[self.out_address]["data"] = dataset
 
 class Block_Generator(primary.Block_Generator):
     """
     Generator class that yields blocks of analysis
     """
 
-    def __init__(self, output, infiles, frames_per_file = None, dimensions = [],
+    def __init__(self, infiles, frames_per_file = None, dimensions = [],
                  **kwargs):
         """
         Initializes generator
@@ -153,21 +158,20 @@ class Block_Generator(primary.Block_Generator):
             - Intelligently break lists of infiles into blocks larger
               than 1
         """
-        out_path, out_address = output
-        self.address          = out_address
-        self.infiles          = infiles
-        self.frames_per_file  = frames_per_file
-        self.dimensions       = dimensions
-        self.expected_shape   = [len(self.infiles) * self.frames_per_file] \
-                              + self.dimensions
-        self.current_index    = 0
-        self.dtype            = np.float32
 
-        dataset_kwargs = dict(chunks = True, compression = "gzip",
-          maxshape = [None] + self.dimensions, scaleoffset = 4)
+        # Input
+        self.infiles           = infiles
+        self.frames_per_file   = frames_per_file
+        self.infiles_per_block = 5
+        self.dimensions        = dimensions
 
-        super(Block_Generator, self).__init__(output,
-          dataset_kwargs = dataset_kwargs, **kwargs)
+        # Action
+        self.dtype          = np.float32
+        self.final_shape    = [len(infiles) * frames_per_file] + dimensions
+        self.dataset_kwargs = dict(chunks = True, compression = "gzip",
+          maxshape = [None] + dimensions, scaleoffset = 4)
+
+        super(Block_Generator, self).__init__(**kwargs)
 
     def next(self):
         """
@@ -176,12 +180,16 @@ class Block_Generator(primary.Block_Generator):
         if len(self.infiles) == 0:
             raise StopIteration()
         else:
-            slice_start         = self.current_index
-            slice_end           = self.current_index + self.frames_per_file
-            self.current_index += self.frames_per_file
-            return Block(infiles    = [self.infiles.pop(0)],
-                         address    = self.address,
-                         slc        = slice(slice_start, slice_end, 1),
-                         dimensions = self.dimensions)
+            block_infiles = self.infiles[:self.infiles_per_block]
+            block_slice   = slice(self.start_index,
+              self.start_index + len(block_infiles) * self.frames_per_file, 1)
+
+            self.infiles      = self.infiles[self.infiles_per_block:]
+            self.start_index += len(block_infiles) * self.frames_per_file
+
+            return Block(infiles     = block_infiles,
+                         out_address = self.out_address,
+                         slc         = block_slice, 
+                         dimensions  = self.dimensions)
 
 

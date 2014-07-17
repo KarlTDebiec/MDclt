@@ -68,9 +68,7 @@ class Block_Generator(Block_Generator):
     Generator class that yields blocks of analysis
     """
 
-    def __init__(self, output, dataset_kwargs = dict(chunks = True,
-                 compression = "gzip"), attrs = {}, force = False,
-                 **kwargs):
+    def __init__(self, output, attrs = {}, force = False, **kwargs):
         """
         Initialize generator
 
@@ -90,45 +88,64 @@ class Block_Generator(Block_Generator):
             - Allow specification of where attrs should be stored, so
               that it is not necessary to override this method for
               this basic feature
+            - Currently assumes constant frames_per_file
         """
         from h5py import File as h5
         from warnings import warn
 
-        out_path, out_address = output
+        # Requires: dtype, final_shape, dataset_kwargs, frames_per_file
+        #           infiles
+        # Modifies: infiles
+        # Provides: out_path, out_address, start_index
 
-        with h5(out_path) as out_h5:
-            if out_address in out_h5:
+        # Output
+        self.out_path    = output[0]
+        self.out_address = output[1]
+
+        with h5(self.out_path) as out_h5:
+            if self.out_address in out_h5:
                 if force:
-                    del out_h5[out_address]
-                    out_h5.create_dataset(out_address,
-                      data = np.empty(self.expected_shape, self.dtype),
-                      **dataset_kwargs)
+                    # Dataset exists but will be overwritten
+
+                    del out_h5[self.out_address]
+                    out_h5.create_dataset(self.out_address,
+                      data = np.empty(self.final_shape, self.dtype),
+                      **self.dataset_kwargs)
+                    self.start_index  = 0
                 else:
-                    dataset       = out_h5[out_address]
-                    current_shape = dataset.shape
-                    if self.expected_shape[0] > current_shape[0]:
-                        dataset.resize(size = self.expected_shape)
-                        self.infiles        = self.infiles[int(current_shape[0]
-                                            / self.frames_per_file):]
-                        self.current_index  = current_shape[0]
-                    elif self.expected_shape[0] < current_shape[0]:
+                    dataset           = out_h5[self.out_address]
+                    preexisting_shape = dataset.shape
+                    if self.final_shape[0] > preexisting_shape[0]:
+                        # Dataset exists, and will be extended
+
+                        dataset.resize(size = self.final_shape)
+                        self.infiles = self.infiles[
+                          int(preexisting_shape[0] / self.frames_per_file):]
+                        self.start_index  = preexisting_shape[0]
+                    elif self.final_shape[0] < preexisting_shape[0]:
+                        # Dataset is longer than expected; do nothing
+
                         warning  = "Fewer infiles provided ({0}) ".format(
                           len(self.infiles))
-                        warning += "than would be expected based on current "
-                        warning += "shape of dataset {0} ".format(
+                        warning += "than would be expected based on  "
+                        warning += "preexisting shape of dataset {0} ".format(
                           current_shape)
                         warning += "and specified number of frames per "
-                        warning += "file ({0})".format(
-                          self.frames_per_file)
+                        warning += "file ({0})".format(self.frames_per_file)
                         warn(warning)
                         self.infiles = []
                     else:
+                        # Dataset is already expected size
+
                         self.infiles = []
             else:
-                out_h5.create_dataset(out_address,
-                  data = np.empty(self.expected_shape, self.dtype),
-                  **dataset_kwargs)
+                # Dataset did not previously exist
+
+                out_h5.create_dataset(self.out_address,
+                  data = np.empty(self.final_shape, self.dtype),
+                  **self.dataset_kwargs)
+                self.start_index  = 0
             for key, value in attrs.items():
-                out_h5[out_address].attrs[key] = value
+                out_h5[self.out_address].attrs[key] = value
 
 

@@ -1,6 +1,6 @@
 #!/usr/bin/python
 #   MDclt.primary.amber.py
-#   Written by Karl Debiec on 12-12-01, last updated by Karl Debiec on 14-07-10
+#   Written by Karl Debiec on 12-12-01, last updated by Karl Debiec on 14-07-17
 """
 Classes for transfer of AMBER simulation logs to h5
 
@@ -59,24 +59,29 @@ def command_line(n_cores = 1, **kwargs):
     from MDclt import pool_director
 
     block_generator = Block_Generator(**kwargs)
-    block_acceptor  = Block_Acceptor(out_path = kwargs["output"][0], **kwargs)
+    block_acceptor  = Block_Acceptor(**kwargs)
     block_acceptor.next()
-    pool            = Pool(n_cores)
 
+    # Serial
+    # for block in block_generator:
+    #     block()
+    #     block_acceptor.send(block)
+
+    # Parallel
+    pool = Pool(n_cores)
     for block in pool.imap_unordered(pool_director, block_generator):
         block_acceptor.send(block)
-
     pool.close()
     pool.join()
-    block_acceptor.close()
 
+    block_acceptor.close()
 
 ################################### CLASSES ####################################
 class Block(Block):
     """
     Independent block of analysis
     """
-    def __init__(self, infiles, raw_keys, new_keys, dtype, address, slc,
+    def __init__(self, infiles, raw_keys, new_keys, dtype, out_address, slc,
                  time_offset = 0, attrs = {}, *args, **kwargs):
         """
         Initializes block of analysis
@@ -95,12 +100,13 @@ class Block(Block):
         from collections import OrderedDict
 
         super(Block, self).__init__(*args, **kwargs)
+
         self.infiles     = infiles
         self.raw_keys    = raw_keys
         self.new_keys    = new_keys
         self.time_offset = time_offset
-        self.address     = address
-        self.datasets    = OrderedDict({address:
+        self.out_address = out_address
+        self.datasets    = OrderedDict({out_address:
                              dict(slc = slc, attrs = attrs,
                                data = np.empty(slc.stop - slc.start, dtype))})
 
@@ -133,10 +139,10 @@ class Block(Block):
                 i += 1
 
         # Copy from raw_data to new_data
-        self.datasets[self.address]["data"]["time"] = (np.array(
+        self.datasets[self.out_address]["data"]["time"] = (np.array(
           raw_data["TIME(PS)"], np.float) / 1000) + self.time_offset
         for raw_key, new_key in zip(self.raw_keys[1:], self.new_keys[1:]):
-            self.datasets[self.address]["data"][new_key] = np.array(
+            self.datasets[self.out_address]["data"][new_key] = np.array(
               raw_data[raw_key])
 
 class Block_Generator(primary.Block_Generator):
@@ -170,7 +176,7 @@ class Block_Generator(primary.Block_Generator):
               ("iters",     "dipole convergence iterations",
                                                          None)]
 
-    def __init__(self, output, infiles, frames_per_file = None, **kwargs):
+    def __init__(self, infiles, frames_per_file = None, **kwargs):
         """
         Initializes generator
 
@@ -186,28 +192,26 @@ class Block_Generator(primary.Block_Generator):
               than 1
         """
 
-        # Store necessary information in instance variables
-        out_path, out_address = output
-        self.address          = out_address
-        self.infiles          = infiles
-        self.frames_per_file  = frames_per_file
-        self.expected_shape   = [len(self.infiles) * self.frames_per_file]
-        self.current_index    = 0
+        # Input
+        self.infiles           = infiles
+        self.frames_per_file   = frames_per_file
+        self.infiles_per_block = 5
+
+        # Action
+        self.final_shape = [len(infiles) * frames_per_file]
+        self.dataset_kwargs = dict(chunks = True, compression = "gzip",
+          maxshape = [None])
 
         # Adjust start time, if applicable
         self.get_time_offset(**kwargs)
 
-        # Determine structure of input data
-        self.get_dataset_format(output = output, **kwargs)
+        # Determine dtype of input data
+        self.get_dataset_format(**kwargs)
 
         # Disregard last infile, if applicable
         self.cut_incomplete_infiles(**kwargs)
 
-        # Complete initialization 
-        dataset_kwargs = dict(chunks = True, compression = "gzip",
-          maxshape = [None])
-        super(Block_Generator, self).__init__(output = output,
-          dataset_kwargs = dataset_kwargs, **kwargs)
+        super(Block_Generator, self).__init__(**kwargs)
 
     def next(self):
         """
@@ -216,16 +220,20 @@ class Block_Generator(primary.Block_Generator):
         if len(self.infiles) == 0:
             raise StopIteration()
         else:
-            slice_start         = self.current_index
-            slice_end           = self.current_index + self.frames_per_file
-            self.current_index += self.frames_per_file
-            return Block(infiles     = [self.infiles.pop(0)],
+            block_infiles = self.infiles[:self.infiles_per_block]
+            block_slice   = slice(self.start_index,
+              self.start_index + len(block_infiles) * self.frames_per_file, 1)
+
+            self.infiles      = self.infiles[self.infiles_per_block:]
+            self.start_index += len(block_infiles) * self.frames_per_file
+
+            return Block(infiles     = block_infiles,
                          raw_keys    = self.raw_keys,
                          new_keys    = self.new_keys,
-                         dtype       = self.dtype,
-                         address     = self.address,
-                         slc         = slice(slice_start, slice_end, 1),
-                         time_offset = self.time_offset)
+                         time_offset = self.time_offset,
+                         out_address = self.out_address,
+                         slc         = block_slice,
+                         dtype       = self.dtype)
 
     def get_time_offset(self, start_time = None, **kwargs):
         """
@@ -234,7 +242,7 @@ class Block_Generator(primary.Block_Generator):
         **Arguments:**
             :*start_time*: Desired time of first frame (ns); typically 0.001
         """
-        import subprocess
+        from subprocess import Popen, PIPE
 
         if start_time is None:
             self.time_offset = 0
@@ -243,8 +251,8 @@ class Block_Generator(primary.Block_Generator):
                 command = "cat {0} | ".format(self.infiles[0]) + \
                           "grep -m 1 'TIME(PS)' | " + \
                           "awk '{{print $6}}'"
-                process = subprocess.Popen(command,
-                            stdout = subprocess.PIPE,
+                process = Popen(command,
+                            stdout = PIPE,
                             stderr = fnull,
                             shell  = True)
                 result  = process.stdout.read()
@@ -306,18 +314,18 @@ class Block_Generator(primary.Block_Generator):
         Checks if log of last infile is incomplete; if so removes from
         list of infiles
         """
-        import subprocess
+        from subprocess import Popen, PIPE
 
         with open(os.devnull, "w") as fnull:
             command = "tail -n 1 {0}".format(self.infiles[-1])
-            process = subprocess.Popen(command,
-                        stdout = subprocess.PIPE,
+            process = Popen(command,
+                        stdout = PIPE,
                         stderr = fnull,
                         shell  = True)
             result  = process.stdout.read()
         if not (result.startswith("|  Total wall time:")          # pmemd.cuda
            or   result.startswith("|  Master Total wall time:")): # pmemd
             self.infiles.pop(-1)
-            self.expected_shape[0] -= self.frames_per_file
+            self.final_shape[0] -= self.frames_per_file
 
 
