@@ -5,16 +5,15 @@
 Classes for analysis of molecular association
 
 .. todo:
-    - Support bin expressions in the same variety of forms that WESTPA does
-    - Support additional dimensions (change -coord from accepting 2 arguments to 2 * N arguments, same for -bins)
     - Support ignoring portion of dataset
 """
-####################################################### MODULES ########################################################
+################################### MODULES ####################################
 import os, sys
 import numpy as np
 from MDclt import secondary
-from MDclt import Block, Block_Generator, Block_Accumulator, Block_Acceptor, pool_director
-####################################################### CLASSES ########################################################
+from MDclt import Block, Block_Generator, Block_Accumulator, Block_Acceptor
+from MDclt import  pool_director
+################################## FUNCTIONS ###################################
 def add_parser(subparsers, *args, **kwargs):
     """
     Adds subparser for this analysis to a nascent argument parser
@@ -27,18 +26,29 @@ def add_parser(subparsers, *args, **kwargs):
     .. todo:
         - Implement nested subparser (should be 'amber log', not just 'log')
     """
-    subparser = secondary.add_parser(subparsers, name = "association",
-      help = "Analyzes molecular association")
+    subparser  = secondary.add_parser(subparsers,
+      name     = "association",
+      help     = "Analyzes molecular association")
     arg_groups = {ag.title:ag for ag in subparser._action_groups}
 
-    arg_groups["input"].add_argument("-coord", type = str, required = True, nargs = 2,
-      metavar = ("H5_FILE", "ADDRESS"),
-      help = "H5 file and address from which to load coordinate")
+    arg_groups["input"].add_argument(
+      "-coord",
+      type     = str,
+      required = True,
+      nargs    = 2,
+      metavar  = ("H5_FILE", "ADDRESS"),
+      help     = "H5 file and address from which to load coordinate")
 
-    arg_groups["action"].add_argument("-bound", type = float, required = True,
-      help = "Bound state cutoff along coordinate")
-    arg_groups["action"].add_argument("-unbound", type = float, required = True,
-      help = "Unbound state cutoff along coordinate")
+    arg_groups["action"].add_argument(
+      "-bound",
+      type     = float,
+      required = True,
+      help     = "Bound state cutoff along coordinate")
+    arg_groups["action"].add_argument(
+      "-unbound",
+      type     = float,
+      required = True,
+      help     = "Unbound state cutoff along coordinate")
 
     subparser.set_defaults(analysis = command_line)
 
@@ -47,11 +57,13 @@ def concentration(n, volume):
     """
     return float(n) / 6.0221415e23 / (volume * 1e-27)
 
-def block_average(data, func = np.mean, func_kwargs = {"axis": 1}, min_size = 1, **kwargs):
+def block_average(data, func = np.mean, func_kwargs = {"axis": 1}, min_size = 1,
+                  **kwargs):
     """
     """
     full_size   = data.size
-    sizes       = [s for s in list(set([full_size / s for s in range(1, full_size)])) if s >= min_size]
+    sizes       = [s for s in list(set([full_size / s
+                    for s in range(1, full_size)])) if s >= min_size]
     sizes       = np.array(sorted(sizes), np.int)[:-1]
     sds         = np.zeros(sizes.size)
     n_blocks    = full_size // sizes
@@ -60,11 +72,11 @@ def block_average(data, func = np.mean, func_kwargs = {"axis": 1}, min_size = 1,
         values  = func(resized, **func_kwargs)
         sds[i]  = np.std(values)
     ses    = sds / np.sqrt(n_blocks - 1.0)
-#    se_sds = np.sqrt((2.0) / (n_blocks - 1.0)) * ses
+    # se_sds = np.sqrt((2.0) / (n_blocks - 1.0)) * ses
     se_sds = (1.0 / np.sqrt(2.0 * (n_blocks - 1.0))) * ses
-    if ses[-1] == 0.0 or se_sds[-1] == 0.0:     # This happens occasionally and
-        sizes   = sizes[:-1]                    # disrupts curve_fit; it is not clear
-        ses     = ses[:-1]                      # why
+    if ses[-1] == 0.0 or se_sds[-1] == 0.0: # This happens occasionally and
+        sizes   = sizes[:-1]                #   disrupts curve_fit; it is not
+        ses     = ses[:-1]                  #   clear why
         se_sds  = se_sds[:-1]
     return sizes, ses, se_sds
 
@@ -132,7 +144,7 @@ def command_line(n_cores = 1, **kwargs):
     block_acceptor.send(block_accumulator)
     block_acceptor.close()
 
-####################################################### CLASSES ########################################################
+################################### CLASSES ####################################
 class Block(Block):
     def __init__(self, slc, **kwargs):
         for key, value in kwargs.items():       # Is this shameful?
@@ -163,8 +175,10 @@ class Block(Block):
         enter_bound   = np.where(trans_bound   == 1)[0] + 1
         enter_unbound = np.where(trans_unbound == 1)[0] + 1
 
-        # Set state to bound between transitions (CONSIDER ALTERNATIVE OF MAKING A LIST OF SLICES)
-        if enter_bound.size >= 1:                                   # Start at first entrance of bound state
+        # Set state to bound between transitions;
+        #   consider alternative of using a list of slices
+        if enter_bound.size >= 1:
+                                   # Start at first entrance of bound state
             enter = enter_bound[0]
             while True:
                 try:                                                # Look for next entrance of unbound state

@@ -1,6 +1,6 @@
 #!/usr/bin/python
 #   MDclt.__init__.py
-#    Written by Karl Debiec on 12-02-12, last updated by Karl Debiec on 14-07-10
+#   Written by Karl Debiec on 12-02-12, last updated by Karl Debiec on 14-07-16
 """
 Command line tools for analysis of molecular dynamics simulations
 
@@ -66,7 +66,8 @@ class Block_Generator(object):
 class Block_Accumulator(object):
     """
     Coroutine class used to accumulate Blocks of data and perform analysis once
-    the complete data is present; also may act as a Block itself
+    the complete dataset is present; may also act as a Block itself and be
+    added by a Block_Acceptor
     """
     def __init__(self, **kwargs):
         """
@@ -136,9 +137,8 @@ class Block_Acceptor(object):
             try:
                 while(True):
                     block = yield
-                    for dataset in block.datasets:
-                        address = dataset["address"]
-                        data    = dataset["data"]
+                    for address, dataset in block.datasets.items():
+                        data = dataset["data"]
                         if "slc" in dataset:
                             slc = dataset["slc"]
                             out_h5[address][slc] = data

@@ -92,6 +92,7 @@ class Block_Generator(Block_Generator):
               this basic feature
         """
         from h5py import File as h5
+        from warnings import warn
 
         out_path, out_address = output
 
@@ -105,11 +106,22 @@ class Block_Generator(Block_Generator):
                 else:
                     dataset       = out_h5[out_address]
                     current_shape = dataset.shape
-                    if self.expected_shape != current_shape:
+                    if self.expected_shape[0] > current_shape[0]:
                         dataset.resize(size = self.expected_shape)
                         self.infiles        = self.infiles[int(current_shape[0]
                                             / self.frames_per_file):]
                         self.current_index  = current_shape[0]
+                    elif self.expected_shape[0] < current_shape[0]:
+                        warning  = "Fewer infiles provided ({0}) ".format(
+                          len(self.infiles))
+                        warning += "than would be expected based on current "
+                        warning += "shape of dataset {0} ".format(
+                          current_shape)
+                        warning += "and specified number of frames per "
+                        warning += "file ({0})".format(
+                          self.frames_per_file)
+                        warn(warning)
+                        self.infiles = []
                     else:
                         self.infiles = []
             else:

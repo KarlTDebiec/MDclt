@@ -77,7 +77,7 @@ class Block(Block):
     Independent block of analysis
     """
     def __init__(self, infiles, raw_keys, new_keys, dtype, address, slc,
-                 time_offset = 0, *args, **kwargs):
+                 time_offset = 0, attrs = {}, *args, **kwargs):
         """
         Initializes block of analysis
 
@@ -90,14 +90,19 @@ class Block(Block):
             :*slc*:         Slice within dataset at which this block
                             will be stored
             :*time_offset*: Offset by which to adjust simulation time
+            :*attrs*:       Attributes to add to dataset
         """
+        from collections import OrderedDict
+
         super(Block, self).__init__(*args, **kwargs)
         self.infiles     = infiles
         self.raw_keys    = raw_keys
         self.new_keys    = new_keys
-        self.datasets    = [dict(address = address, slc = slc, attrs = {},
-                            data = np.empty(slc.stop - slc.start, dtype))]
         self.time_offset = time_offset
+        self.address     = address
+        self.datasets    = OrderedDict({address:
+                             dict(slc = slc, attrs = attrs,
+                               data = np.empty(slc.stop - slc.start, dtype))})
 
     def __call__(self, **kwargs):
         """
@@ -105,7 +110,7 @@ class Block(Block):
         """
 
         # Load raw data from each infile
-        raw_data = {raw_key:[] for raw_key in self.raw_keys}
+        raw_data = {raw_key: [] for raw_key in self.raw_keys}
         for infile in self.infiles:
             with open(infile, "r") as infile:
                 raw_text = [line.strip() for line in infile.readlines()]
@@ -128,10 +133,11 @@ class Block(Block):
                 i += 1
 
         # Copy from raw_data to new_data
-        self.datasets[0]["data"]["time"] = (np.array(raw_data["TIME(PS)"],
-          np.float) / 1000) + self.time_offset
+        self.datasets[self.address]["data"]["time"] = (np.array(
+          raw_data["TIME(PS)"], np.float) / 1000) + self.time_offset
         for raw_key, new_key in zip(self.raw_keys[1:], self.new_keys[1:]):
-            self.datasets[0]["data"][new_key] = np.array(raw_data[raw_key])
+            self.datasets[self.address]["data"][new_key] = np.array(
+              raw_data[raw_key])
 
 class Block_Generator(primary.Block_Generator):
     """
@@ -155,7 +161,7 @@ class Block_Generator(primary.Block_Generator):
                                                          "kcal mol-1"),
               ("VIRIAL",    "virial energy",             "kcal mol-1"),
               ("EPOLZ",     "polarization energy",       "kcal mol-1"),
-              ("TEMP(K)",   "temperature energy",        "K"),
+              ("TEMP(K)",   "temperature",               "K"),
               ("PRESS",     "pressure",                  "bar"),
               ("VOLUME",    "volume",                    "A3"),
               ("Density",   "density",                   "g/cm3"),
@@ -182,7 +188,7 @@ class Block_Generator(primary.Block_Generator):
 
         # Store necessary information in instance variables
         out_path, out_address = output
-        self.out_address      = out_address
+        self.address          = out_address
         self.infiles          = infiles
         self.frames_per_file  = frames_per_file
         self.expected_shape   = [len(self.infiles) * self.frames_per_file]
@@ -217,7 +223,7 @@ class Block_Generator(primary.Block_Generator):
                          raw_keys    = self.raw_keys,
                          new_keys    = self.new_keys,
                          dtype       = self.dtype,
-                         address     = self.out_address,
+                         address     = self.address,
                          slc         = slice(slice_start, slice_end, 1),
                          time_offset = self.time_offset)
 
@@ -297,7 +303,8 @@ class Block_Generator(primary.Block_Generator):
 
     def cut_incomplete_infiles(self, **kwargs):
         """
-        Checks if log of last infile is incomplete; if so removes from list of infiles
+        Checks if log of last infile is incomplete; if so removes from
+        list of infiles
         """
         import subprocess
 

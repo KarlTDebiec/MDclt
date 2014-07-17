@@ -4,11 +4,11 @@
 """
 Classes and functions for secondary analysis of molecular dynamics simulations
 """
-####################################################### MODULES ########################################################
+################################### MODULES ####################################
 from __future__ import division, print_function
 import os, sys
 import numpy as np
-###################################################### FUNCTIONS #######################################################
+################################## FUNCTIONS ###################################
 def add_parser(subparsers, *args, **kwargs):
     """
     Adds subparser for this analysis to a nascent argument parser
@@ -23,21 +23,39 @@ def add_parser(subparsers, *args, **kwargs):
                   "action": subparser.add_argument_group("action"),
                   "output": subparser.add_argument_group("output")}
 
-    arg_groups["input"].add_argument("-log", type = str, required = True, nargs = 2,
-      metavar = ("H5_FILE", "ADDRESS"),
-      help = "H5 file and address from which to load simulation log")
+    arg_groups["input"].add_argument(
+      "-log",
+      type     = str,
+      required = True,
+      nargs    = 2,
+      metavar  = ("H5_FILE", "ADDRESS"),
+      help     = "H5 file and address from which to load simulation log")
 
-    arg_groups["action"].add_argument("-n_cores", type = int, required = False, default = 1,
-      help = "Number of cores on which to carry out analysis")
+    arg_groups["action"].add_argument(
+      "-n_cores",
+      type     = int,
+      required = False,
+      default  = 1,
+      help     = "Number of cores on which to carry out analysis")
 
-    arg_groups["output"].add_argument("-output", type = str, required = True, nargs = 2,
-      metavar = ("H5_FILE", "ADDRESS"),
-      help = "H5 file and address at which to output data")
-    arg_groups["output"].add_argument("-attrs", type = str, required = False, nargs = "*",
-      metavar = "KEY VALUE", 
-      help = "Attributes to add to dataset (optional)")
-    arg_groups["output"].add_argument("--force", action = "store_true",
-      help = "Overwrite data if already present")
+    arg_groups["output"].add_argument(
+      "-output",
+      type     = str,
+      required = True,
+      nargs    = 2,
+      metavar  = ("H5_FILE", "ADDRESS"),
+      help     = "H5 file and address at which to output data")
+    arg_groups["output"].add_argument(
+      "-attrs",
+      type     = str,
+      required = False,
+      nargs    = "*",
+      metavar  = "KEY VALUE", 
+      help     = "Attributes to add to dataset (optional)")
+    arg_groups["output"].add_argument(
+      "--force",
+      action   = "store_true",
+      help     = "Overwrite data if already present")
 
     return subparser
 

@@ -1,11 +1,10 @@
 #!/usr/bin/python
 #   MDclt.primary.raw.py
-#   Written by Karl Debiec on 14-06-30, last updated by Karl Debiec on 14-07-10
+#   Written by Karl Debiec on 14-06-30, last updated by Karl Debiec on 14-07-16
 """
 Classes for transfer of data from raw text files to h5
 
 .. todo:
-    - Better support appending data rather than reloading complete dataset
     - Look into improving speed (np.loadtxt or np.genfromtxt may actually be
       preferable)
 """
@@ -76,8 +75,8 @@ class Block(Block):
     """
     Independent block of analysis
     """
-    def __init__(self, infiles, address, slc, dimensions = None, *args,
-                 **kwargs):
+    def __init__(self, infiles, address, slc, dimensions = [], attrs = {},
+                 *args, **kwargs):
         """
         Initializes block of analysis
 
@@ -88,11 +87,16 @@ class Block(Block):
                            will be stored
             :*dimensions*: Additional dimensions in dataset; if
                            multidimensional (optional)
+            :*attrs*:      Attributes to add to dataset
         """
+        from collections import OrderedDict
+
         super(Block, self).__init__(*args, **kwargs)
         self.infiles     = infiles
         self.dimensions  = dimensions
-        self.datasets    = [dict(address = address, slc = slc, attrs = {})]
+        self.address     = address
+        self.datasets    = OrderedDict({address:
+                             dict(slc = slc, attrs = attrs)})
 
     def __call__(self, **kwargs):
         """
@@ -102,7 +106,8 @@ class Block(Block):
 
         # Load raw data into numpy using shell commands;
         #   there may be a faster way to do this;
-        #   but this is at least faster than np.loadtxt(..
+        #   but this is at least faster than np.loadtxt(...)
+        #   for multiple files
         command     = "cat {0} | sed ':a;N;$!ba;s/\\n//g'".format(
                         " ".join(self.infiles))
         process     = subprocess.Popen(command, stdout = subprocess.PIPE,
@@ -118,12 +123,12 @@ class Block(Block):
         # dataset = np.concatenate(dataset)
 
         # Reshape if necessary
-        if self.dimensions is not None:
+        if len(self.dimensions) != 0:
             dataset = dataset.reshape([dataset.size 
-                    / np.product(self.dimensions)] + self.dimensions)
+                        / np.product(self.dimensions)] + self.dimensions)
 
         # Store in instance variable
-        self.datasets[0]["data"] = dataset
+        self.datasets[self.address]["data"] = dataset
 
 class Block_Generator(primary.Block_Generator):
     """
@@ -149,7 +154,7 @@ class Block_Generator(primary.Block_Generator):
               than 1
         """
         out_path, out_address = output
-        self.out_address      = out_address
+        self.address          = out_address
         self.infiles          = infiles
         self.frames_per_file  = frames_per_file
         self.dimensions       = dimensions
@@ -159,7 +164,7 @@ class Block_Generator(primary.Block_Generator):
         self.dtype            = np.float32
 
         dataset_kwargs = dict(chunks = True, compression = "gzip",
-          maxshape = [None] + self.dimensions)
+          maxshape = [None] + self.dimensions, scaleoffset = 4)
 
         super(Block_Generator, self).__init__(output,
           dataset_kwargs = dataset_kwargs, **kwargs)
@@ -175,7 +180,7 @@ class Block_Generator(primary.Block_Generator):
             slice_end           = self.current_index + self.frames_per_file
             self.current_index += self.frames_per_file
             return Block(infiles    = [self.infiles.pop(0)],
-                         address    = self.out_address,
+                         address    = self.address,
                          slc        = slice(slice_start, slice_end, 1),
                          dimensions = self.dimensions)
 
