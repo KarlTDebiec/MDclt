@@ -40,13 +40,6 @@ def add_parser(subparsers, *args, **kwargs):
       help     = "Number of cores on which to carry out analysis")
 
     arg_groups["output"].add_argument(
-      "-output",
-      type     = str,
-      required = True,
-      nargs    = 2,
-      metavar  = ("H5_FILE", "ADDRESS"),
-      help     = "H5 file and address at which to output data")
-    arg_groups["output"].add_argument(
       "-attrs",
       type     = str,
       required = False,
@@ -82,7 +75,7 @@ class Block_Generator(Block_Generator):
 
         # Output
         out_path, out_address = output
-        with h5(self.out_path) as out_h5:
+        with h5(out_path) as out_h5:
             if force or not out_address in out_h5:
                 self.start_index       = 0
                 self.preexisting_slice = None

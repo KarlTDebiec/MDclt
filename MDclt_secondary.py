@@ -1,6 +1,6 @@
 #!/usr/bin/python
 #   MDclt_secondary.py
-#   Written by Karl Debiec on 14-07-06, last updated by Karl Debiec on 14-07-09
+#   Written by Karl Debiec on 14-07-06, last updated by Karl Debiec on 14-07-31
 """
 Command Line Tool to manage secondary analysis of molecular dynamics simulations
 

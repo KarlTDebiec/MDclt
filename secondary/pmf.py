@@ -60,6 +60,13 @@ def add_parser(subparsers, *args, **kwargs):
       default  = 298.0,
       help     = "System temperature (default %(default)s)")
 
+    arg_groups["output"].add_argument(
+      "-output",
+      type     = str,
+      required = True,
+      nargs    = 2,
+      metavar  = ("H5_FILE", "ADDRESS"),
+      help     = "H5 file and address at which to output data")
     subparser.set_defaults(analysis = command_line)
 
 def command_line(n_cores = 1, **kwargs):
@@ -115,11 +122,16 @@ class Block(Block):
         """
         from collections import OrderedDict
 
+        # Input
         self.coord       = coord
+
+        # Action
         self.bins        = bins
+
+        # Output
         self.out_address = out_address
-        self.datasets    = OrderedDict({out_address:
-                             dict(slc = slc, attrs = attrs)})
+        self.datasets    = OrderedDict(
+          {out_address: dict(slc = slc, attrs = attrs)})
 
     def __call__(self, **kwargs):
         """
