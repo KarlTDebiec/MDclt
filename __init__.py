@@ -130,7 +130,6 @@ class Block_Acceptor(Block_Accumulator):
         Initializes wrapped function
         """
         self.out_path = kwargs.get("out_path", kwargs.pop("output")[0])
-
         super(Block_Acceptor, self).__init__(*args, **kwargs)
 
     def receive_block(self, **kwargs):

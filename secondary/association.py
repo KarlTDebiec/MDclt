@@ -146,11 +146,11 @@ def command_line(n_cores = 1, **kwargs):
     pool.join()
 
     block_accumulator.close()
-
-#    block_acceptor = Block_Acceptor(**kwargs)
-#    block_acceptor.next()
-#    block_acceptor.send(block_accumulator)
-#    block_acceptor.close()
+    print(kwargs)
+    block_acceptor = Block_Acceptor(out_path = kwargs["output"], **kwargs)
+    block_acceptor.next()
+    block_acceptor.send(block_accumulator)
+    block_acceptor.close()
 
 ################################### CLASSES ####################################
 class Block(Block):
@@ -400,21 +400,22 @@ class Block_Generator(Block_Generator):
 class Block_Accumulator(Block_Accumulator):
     """
     """
-    def __init__(self, log, coord, **kwargs):
+    def __init__(self, log, coord, output, **kwargs):
         """
         """
         from h5py import File as h5
         from collections import OrderedDict
 
         super(Block_Accumulator, self).__init__(**kwargs)
-        log_path,   log_address   = log
-        coord_path, coord_address = coord
-        with h5(log_path) as log_h5, h5(coord_path) as coord_h5:
+        self.log_path,   self.log_address   = log
+        self.coord_path, self.coord_address = coord
+        self.out_path                       = output
+        with h5(self.log_path) as log_h5, h5(self.coord_path) as coord_h5:
             # Need to support omitting the beginning and end of trajectories
-            coord_shape       = coord_h5[coord_address].shape
+            coord_shape       = coord_h5[self.coord_address].shape
             self.n_molecule_1 = coord_shape[1]
             self.n_molecule_2 = coord_shape[2]
-            self.volume       = np.mean(log_h5[log_address]["volume"])
+            self.volume       = np.mean(log_h5[self.log_address]["volume"])
         self.conc_molecule_1  = concentration(self.n_molecule_1, self.volume)
         self.conc_molecule_2  = concentration(self.n_molecule_2, self.volume)
         self.count            = np.zeros((coord_shape[0], self.n_molecule_1),
