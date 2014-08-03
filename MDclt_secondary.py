@@ -1,6 +1,6 @@
 #!/usr/bin/python
 #   MDclt_secondary.py
-#   Written by Karl Debiec on 14-07-06, last updated by Karl Debiec on 14-07-31
+#   Written by Karl Debiec on 14-07-06, last updated by Karl Debiec on 14-08-02
 """
 Command Line Tool to manage secondary analysis of molecular dynamics simulations
 
@@ -15,25 +15,26 @@ import numpy as np
 if __name__ == "__main__":
 
     # Prepare argument parser
-    parser = argparse.ArgumentParser(
-               description     = __doc__,
-               formatter_class = argparse.RawTextHelpFormatter)
-    subparsers = parser.add_subparsers(dest = "package", description = "")
+    parser            = argparse.ArgumentParser(
+      description     = __doc__,
+      formatter_class = argparse.RawTextHelpFormatter)
+    tool_subparsers   = parser.add_subparsers(
+      dest            = "tool",
+      description     = "")
 
     from MDclt.secondary import pmf
-    from MDclt.secondary import association
-    pmf.add_parser(subparsers)
-    association.add_parser(subparsers)
+    pmf.add_parser(tool_subparsers)
+    #from MDclt.secondary import association
+    #association.add_parser(subparsers_tools)
 
     # Parse arguments
     kwargs = vars(parser.parse_args())
     if kwargs["attrs"] is not None:
-        kwargs["attrs"] = {key: value
-                            for key, value in zip(*[iter(kwargs["attrs"])] * 2)}
+        kwargs["attrs"] = {k: v for k, v in zip(*[iter(kwargs["attrs"])] * 2)}
     else:
         kwargs["attrs"] = {}
 
     # Run selected analysis
-    analysis = kwargs.pop("analysis")(**kwargs)
+    kwargs.pop("analysis")(**kwargs)
 
 

@@ -1,6 +1,6 @@
 #!/usr/bin/python
 #   MDclt.secondary.Pmf.py
-#   Written by Karl Debiec on 12-08-15, last updated by Karl Debiec on 14-07-17
+#   Written by Karl Debiec on 12-08-15, last updated by Karl Debiec on 14-08-02
 """
 Classes for calculation of potential of mean force
 
@@ -19,7 +19,7 @@ from MDclt.secondary import Block_Generator
 from MDclt import Block, Block_Accumulator, Block_Acceptor
 from MDclt import pool_director
 ################################## FUNCTIONS ###################################
-def add_parser(subparsers, *args, **kwargs):
+def add_parser(tool_subparsers, **kwargs):
     """
     Adds subparser for this analysis to a nascent argument parser
 
@@ -28,46 +28,77 @@ def add_parser(subparsers, *args, **kwargs):
         :*\*args*:     Passed to *subparsers*.add_parser(...)
         :*\*\*kwargs*: Passed to *subparsers*.add_parser(...)
     """
-    subparser  = secondary.add_parser(subparsers,
+    tool_subparser = tool_subparsers.add_parser(
       name     = "pmf",
       help     = "Calculates potential of mean force")
-    arg_groups = {ag.title:ag for ag in subparser._action_groups}
+    pdf_subparsers = tool_subparser.add_subparsers(
+      dest = "pdf",
+      description = "")
 
-    arg_groups["input"].add_argument(
-      "-coord",
-      type     = str,
-      required = True,
-      nargs    = 2,
-      metavar  = ("H5_FILE", "ADDRESS"),
-      help     = "H5 file and address from which to load coordinate")
+    hist_subparser = secondary.add_parser(pdf_subparsers,
+      name = "hist",
+      help = "Estimates probability density function using a histogram")
+    
+    kde_subparser  = secondary.add_parser(pdf_subparsers,
+      name = "kde",
+      help = "Estimates probability density function using a kernal density estimate")
 
-    arg_groups["action"].add_argument(
+    arg_groups = {
+        hist_subparser: {ag.title: ag for ag in hist_subparser._action_groups},
+        kde_subparser:  {ag.title: ag for ag in kde_subparser._action_groups}}
+
+    for pdf_subparser in [hist_subparser, kde_subparser]:
+        arg_groups[pdf_subparser]["input"].add_argument(
+          "-coord",
+          type     = str,
+          required = True,
+          nargs    = 2,
+          metavar  = ("H5_FILE", "ADDRESS"),
+          help     = "H5 file and address from which to load coordinate")
+
+    arg_groups[hist_subparser]["action"].add_argument(
       "-bins",
       type     = str,
       required = True,
       metavar  = "BINEXPR",
       help     = "Python expression used to generate bins")
-    arg_groups["action"].add_argument(
-      "-zero_point",
-      type     = str,
-      required = False,
-      help     = "Point at which to adjust PMF to 0; " + \
-                 "alternatively range of points (e.g. 10-12) " + \
-                 "at which to adjust average to 0 (optional)")
-    arg_groups["action"].add_argument(
-      "-temperature",
-      type     = str,
-      default  = 298.0,
-      help     = "System temperature (default %(default)s)")
-
-    arg_groups["output"].add_argument(
-      "-output",
+    arg_groups[kde_subparser]["action"].add_argument(
+      "-grid",
       type     = str,
       required = True,
-      nargs    = 2,
-      metavar  = ("H5_FILE", "ADDRESS"),
-      help     = "H5 file and address at which to output data")
-    subparser.set_defaults(analysis = command_line)
+      metavar  = "GRIDEXPR",
+      help     = "Python expression used to generate grid")
+    arg_groups[kde_subparser]["action"].add_argument(
+      "-bandwidth",
+      type     = float,
+      required = True,
+      help     = "Bandwidth of kernel density estimate")
+
+    for pdf_subparser in [hist_subparser, kde_subparser]:
+        arg_groups[pdf_subparser]["action"].add_argument(
+          "-zero_point",
+          type     = str,
+          required = False,
+          help     = "Point at which to adjust PMF to 0; " + \
+                     "alternatively range of points (e.g. 10-12) " + \
+                     "at which to adjust average to 0 (optional)")
+        arg_groups[pdf_subparser]["action"].add_argument(
+          "-temperature",
+          type     = str,
+          default  = 298.0,
+          help     = "System temperature (default %(default)s)")
+
+    for pdf_subparser in [hist_subparser, kde_subparser]:
+        arg_groups[pdf_subparser]["output"].add_argument(
+          "-output",
+          type     = str,
+          required = True,
+          nargs    = 1,
+          metavar  = "H5_FILE",
+          help     = "H5 file in which to output data")
+
+    for pdf_subparser in [hist_subparser, kde_subparser]:
+        pdf_subparser.set_defaults(analysis = command_line)
 
 def command_line(n_cores = 1, **kwargs):
     """

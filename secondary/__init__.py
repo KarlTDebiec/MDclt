@@ -10,7 +10,7 @@ import os, sys
 import numpy as np
 from MDclt import Block_Generator, Block_Accumulator
 ################################## FUNCTIONS ###################################
-def add_parser(subparsers, *args, **kwargs):
+def add_parser(subparsers, **kwargs):
     """
     Adds subparser for this analysis to a nascent argument parser
 
@@ -19,7 +19,7 @@ def add_parser(subparsers, *args, **kwargs):
         :*\*args*:     Passed to *subparsers*.add_parser(...)
         :*\*\*kwargs*: Passed to *subparsers*.add_parser(...)
     """
-    subparser = subparsers.add_parser(*args, **kwargs)
+    subparser = subparsers.add_parser(**kwargs)
     arg_groups = {"input":  subparser.add_argument_group("input"),
                   "action": subparser.add_argument_group("action"),
                   "output": subparser.add_argument_group("output")}
