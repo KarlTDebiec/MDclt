@@ -1,6 +1,6 @@
 #!/usr/bin/python
 #   MDclt.secondary.Pmf.py
-#   Written by Karl Debiec on 12-08-15, last updated by Karl Debiec on 14-07-17
+#   Written by Karl Debiec on 12-08-15, last updated by Karl Debiec on 14-08-04
 """
 Classes for calculation of potential of mean force
 
@@ -15,7 +15,7 @@ Classes for calculation of potential of mean force
 import os, sys
 import numpy as np
 from MDclt import secondary
-from MDclt.secondary import Block_Generator
+from MDclt.secondary import Secondary_Block_Generator
 from MDclt import Block, Block_Accumulator, Block_Acceptor
 from MDclt import pool_director
 ################################## FUNCTIONS ###################################
@@ -140,7 +140,7 @@ class Block(Block):
         hist, _ = np.histogram(self.coord, self.bins)
         self.datasets[self.out_address]["count"] = hist
 
-class Block_Generator(Block_Generator):
+class Block_Generator(Secondary_Block_Generator):
     """
     Generator class that yields blocks of analysis
     """
@@ -272,13 +272,17 @@ class Block_Accumulator(Block_Accumulator):
         import types
 
         self.func.close(*args, **kwargs)
+
+        # Link to datasets for clarity
         dataset = self.datasets[self.out_address]["data"]
         attrs   = self.datasets[self.out_address]["attrs"]
+
+        # Process slice information
         if self.incoming_slice is None:
             self.datasets = {}
             return
         if len(self.received_slices) != 1:
-            raise Exception("A portion of the data appears to have been lost; "
+            raise Exception("A portion of the data is missing; "
                     + "Expected to receive {0}; ".format(self.incoming_slice)
                     + "But received {0}".format(self.received_slices))
         if self.preexisting_slice is None:
@@ -287,7 +291,6 @@ class Block_Accumulator(Block_Accumulator):
         else:
             attrs["slice"] = str(slice(self.preexisting_slice.start,
                                    self.received_slices[0].stop, 1))
-            
 
         # Calculate free energy and PMF
         probability = np.array(dataset["count"],
