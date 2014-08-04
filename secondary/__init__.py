@@ -1,6 +1,6 @@
 #!/usr/bin/python
 #   MDclt.secondary.__init__.py
-#   Written by Karl Debiec on 14-07-06, last updated by Karl Debiec on 14-07-10
+#   Written by Karl Debiec on 14-07-06, last updated by Karl Debiec on 14-08-04
 """
 Classes and functions for secondary analysis of molecular dynamics simulations
 """
@@ -8,7 +8,7 @@ Classes and functions for secondary analysis of molecular dynamics simulations
 from __future__ import division, print_function
 import os, sys
 import numpy as np
-from MDclt import Block_Generator, Block_Accumulator
+from MDclt import Block_Generator
 ################################## FUNCTIONS ###################################
 def add_parser(subparsers, **kwargs):
     """
@@ -54,11 +54,11 @@ def add_parser(subparsers, **kwargs):
     return subparser
 
 ################################### CLASSES ####################################
-class Block_Generator(Block_Generator):
+class Secondary_Block_Generator(Block_Generator):
     """
     Generator class that yields blocks of analysis
     """
-    def __init__(self, inputs, output, force = False, *args, **kwargs):
+    def __init__(self, inputs, output, force = False, **kwargs):
         from warnings import warn
         from h5py import File as h5
 
@@ -90,5 +90,7 @@ class Block_Generator(Block_Generator):
                 self.incoming_slice = slice(self.start_index,
                                             self.final_index, 1)
 
-        super(Block_Generator, self).__init__(force = force, *args, **kwargs)
+        super(Secondary_Block_Generator, self).__init__(
+          force = force, **kwargs)
+
 

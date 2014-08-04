@@ -1,6 +1,6 @@
 #!/usr/bin/python
 #   MDclt.secondary.Association.py
-#   Written by Karl Debiec on 12-08-15, last updated by Karl Debiec on 14-07-17
+#   Written by Karl Debiec on 12-08-15, last updated by Karl Debiec on 14-08-04
 """
 Classes for analysis of molecular association
 
@@ -11,9 +11,9 @@ Classes for analysis of molecular association
 import os, sys
 import numpy as np
 from MDclt import secondary
-from MDclt.secondary import Block_Generator
+from MDclt.secondary import Secondary_Block_Generator
 from MDclt import Block, Block_Accumulator, Block_Acceptor
-from MDclt import  pool_director
+from MDclt import pool_director
 ################################## FUNCTIONS ###################################
 def concentration(n, volume):
     """
@@ -126,8 +126,8 @@ def command_line(n_cores = 1, **kwargs):
     """
     from multiprocessing import Pool
 
-    block_generator   = Block_Generator(**kwargs)
-    block_accumulator = Block_Accumulator(
+    block_generator   = Association_Block_Generator(**kwargs)
+    block_accumulator = Association_Block_Accumulator(
                           preexisting_slice = block_generator.preexisting_slice,
                           incoming_slice    = block_generator.incoming_slice,
                           **kwargs)
@@ -139,27 +139,24 @@ def command_line(n_cores = 1, **kwargs):
 #        block_accumulator.send(block)
 
     # Parallel (Processes)
-    pool              = Pool(n_cores)
+    pool = Pool(n_cores)
     for block in pool.imap_unordered(pool_director, block_generator):
         block_accumulator.send(block)
     pool.close()
     pool.join()
 
     block_accumulator.close()
-    print(kwargs)
     block_acceptor = Block_Acceptor(out_path = kwargs["output"], **kwargs)
     block_acceptor.next()
     block_acceptor.send(block_accumulator)
     block_acceptor.close()
 
 ################################### CLASSES ####################################
-class Block(Block):
+class Association_Block(Block):
     """
     """
-    def __init__(self, coord,
-                 bound_cutoff, unbound_cutoff, conc_single,
-                 slc, attrs = {},
-                 **kwargs):
+    def __init__(self, coord, bound_cutoff, unbound_cutoff, conc_single, slc,
+                 attrs = {}, **kwargs):
         """
         """
         from collections import OrderedDict
@@ -180,6 +177,8 @@ class Block(Block):
           {"pair_association": dict(slc   = slc[1:], attrs = attrs),
            "bound":            dict(slc   = slc[1:], attrs = {}),
            "events":           dict(data  = [],      attrs = {})})
+
+        super(Association_Block, self).__init__(**kwargs)
 
     def __call__(self, **kwargs):
         # Get references to instance variables
@@ -323,14 +322,14 @@ class Block(Block):
                    ("kon",          "f4"), ("kon se",          "f4"),
                    ("koff",         "f4"), ("koff se",         "f4")])
 
-class Block_Generator(Block_Generator):
+class Association_Block_Generator(Secondary_Block_Generator):
     """
     Generator class that yields blocks of analysis
     """
     def __init__(self,
                  log, coord,
                  bound, unbound,
-                 output, force = False, *args, **kwargs):
+                 output, force = False, **kwargs):
         """
         Initializes generator
 
@@ -362,8 +361,9 @@ class Block_Generator(Block_Generator):
         self.conc_molecule_1 = concentration(self.n_molecule_1, self.volume)
         self.conc_molecule_2 = concentration(self.n_molecule_2, self.volume)
 
-        super(Block_Generator, self).__init__(inputs = [log, coord],
-          output = [output, "KA"], *args, **kwargs)
+        super(Association_Block_Generator, self).__init__(
+          inputs = [log, coord], output = [output, "overall_association"],
+          **kwargs)
 
     def next(self):
         """
@@ -371,45 +371,53 @@ class Block_Generator(Block_Generator):
         """
         from h5py import File as h5
 
+        # No new trajectory to analyze
+        if self.start_index == self.final_index:
+            raise StopIteration()
+
         if self.i == self.n_molecule_1:
             raise StopIteration()
         else:
-            # Load primary data
+            # Determine slice indexes
+            block_slice = (slice(self.start_index, self.final_index, 1),
+                           slice(self.i), slice(self.j))
+
+            # Load primary data from these indexes
             with h5(self.coord_path) as coord_h5:
-                coord = np.array(coord_h5
-                          [self.coord_address]
-                          [self.start_index:self.final_index,
-                           self.i,
-                           self.j])
-            block = Block(
-                     coord          = coord,
+                block_coord = np.array(coord_h5
+                  [self.coord_address]
+                  [self.start_index:self.final_index,self.i,self.j])
+            block = Association_Block(
+                     coord          = block_coord,
                      bound_cutoff   = self.bound,
                      unbound_cutoff = self.unbound,
                      conc_single    = self.conc_single,
-                     slc            = (slice(self.start_index,
-                                             self.final_index, 1),
-                                       slice(self.i),
-                                       slice(self.j)))
-            # Iterate and return
+                     slc            = block_slice)
+
+            # Iterate
             self.j     += 1
             if self.j  == self.n_molecule_2:
                 self.i += 1
                 self.j  = 0
+
+            # Return new block
             return block
 
-class Block_Accumulator(Block_Accumulator):
+class Association_Block_Accumulator(Block_Accumulator):
     """
     """
-    def __init__(self, log, coord, output, **kwargs):
+    def __init__(self, log, coord, output, preexisting_slice, incoming_slice,
+                 attrs = {}, **kwargs):
         """
         """
         from h5py import File as h5
         from collections import OrderedDict
 
-        super(Block_Accumulator, self).__init__(**kwargs)
+        super(Association_Block_Accumulator, self).__init__(**kwargs)
         self.log_path,   self.log_address   = log
         self.coord_path, self.coord_address = coord
         self.out_path                       = output
+
         with h5(self.log_path) as log_h5, h5(self.coord_path) as coord_h5:
             # Need to support omitting the beginning and end of trajectories
             coord_shape       = coord_h5[self.coord_address].shape
@@ -420,6 +428,9 @@ class Block_Accumulator(Block_Accumulator):
         self.conc_molecule_2  = concentration(self.n_molecule_2, self.volume)
         self.count            = np.zeros((coord_shape[0], self.n_molecule_1),
                                   np.int8)
+
+        self.preexisting_slice = preexisting_slice
+        self.incoming_slice    = incoming_slice
 
         # Prepare datasets
         self.datasets  = OrderedDict(
@@ -443,6 +454,8 @@ class Block_Accumulator(Block_Accumulator):
           attrs   = {},
           data    = []))
 
+        super(Association_Block_Accumulator, self).__init__(**kwargs)
+
     def receive_block(self, **kwargs):
         pair_association = self.datasets["pair_association"]["data"]
         events           = self.datasets["events"]["data"]
@@ -452,10 +465,11 @@ class Block_Accumulator(Block_Accumulator):
             events += block.datasets["events"]["data"]
             pair_association[block.i, block.j] = \
               block.datasets["pair_association"]["data"]
-
             self.count[:, block.i] += block.datasets["bound"]["bound"]
 
     def close(self, *args, **kwargs):
+        """
+        """
         self.func.close(*args, **kwargs)
 
         # Link to datasets for clarity
@@ -465,6 +479,16 @@ class Block_Accumulator(Block_Accumulator):
         count        = self.count
         C_mol1_total = self.conc_molecule_1
         C_mol2_total = self.conc_molecule_2
+
+        # Process slice information
+        if self.incoming_slice is None:
+            self.datasets = {}
+            return
+        slc = str(
+          slice(self.incoming_slice.start, self.incoming_slice.stop, 1))
+        self.datasets["pair_association"]["attrs"]["slice"]    = slc
+        self.datasets["overall_association"]["attrs"]["slice"] = slc
+        self.datasets["events"]["attrs"]["slice"]              = slc
 
         # Configure pair and total association datasets
         for key in ["pbound", "mean fpt on", "mean fpt off", "kon", "koff"]:
