@@ -1,6 +1,6 @@
 #!/usr/bin/python
 #   MDclt.__init__.py
-#   Written by Karl Debiec on 12-02-12, last updated by Karl Debiec on 14-07-16
+#   Written by Karl Debiec on 12-02-12, last updated by Karl Debiec on 14-08-04
 """
 Command line tools for analysis of molecular dynamics simulations
 
@@ -24,6 +24,42 @@ def pool_director(block):
     """
     block()
     return block
+
+def overridable_defaults(nargs, defaults):
+    """
+    Prepares a custom argparse action to provide optionally overridable
+    defaults for arguments with multiple values
+
+    **Arguments:**
+        :*defaults*: dictionary of defaults; keys are the integer index
+                     within the final list of values
+    """
+    import argparse, types
+
+    class Argparse_Action(argparse.Action):
+        """
+        Custom argparse action to provide optionally overridable
+        defaults for arguments with multiple values
+        """
+        def __call__(self, parser, args, values, option_string = None):
+            """
+            Processes argument values, applying defaults where appropriate
+
+            .. todo:
+                Check that argument numbers are sequential
+            """
+            if not isinstance(values, types.ListType):
+                values = [values]
+            values = dict(defaults.items() +
+                          {k: v for k, v in enumerate(values)}.items())
+            values = [values[k] for k in sorted(values)]
+            if len(values) != nargs:
+                raise argparse.ArgumentTypeError(
+                  "Expected {0} arguments for '{1}', recieved {2}".format(
+                  nargs, self.dest, len(values)))
+            setattr(args, self.dest, values)
+
+    return Argparse_Action
 ################################### CLASSES ####################################
 class Block(object):
     """
@@ -92,7 +128,7 @@ class Block_Accumulator(object):
         Accumulates received Blocks
         """
         raise NotImplementedError(
-                "'Block_Accumulator' class is not implemented")
+          "'Block_Accumulator' class is not implemented")
 
     def receive_slice(self, slc, **kwargs):
         """

@@ -16,9 +16,10 @@ def add_parser(subparsers, **kwargs):
 
     **Arguments:**
         :*subparsers*: <argparse._SubParsersAction> to which to add
-        :*\*args*:     Passed to *subparsers*.add_parser(...)
         :*\*\*kwargs*: Passed to *subparsers*.add_parser(...)
     """
+    from MDclt import overridable_defaults
+
     subparser = subparsers.add_parser(**kwargs)
     arg_groups = {"input":  subparser.add_argument_group("input"),
                   "action": subparser.add_argument_group("action"),
@@ -28,23 +29,25 @@ def add_parser(subparsers, **kwargs):
       "-log",
       type     = str,
       required = True,
-      nargs    = 2,
+      nargs    = "*",
       metavar  = ("H5_FILE", "ADDRESS"),
-      help     = "H5 file and address from which to load simulation log")
+      action   = overridable_defaults(nargs = 2, defaults = {1: "log"}),
+      help     = "H5 file and optionally address from which to load " + 
+                 "simulation log (default ADDRESS: log)")
 
     arg_groups["action"].add_argument(
       "-n_cores",
       type     = int,
       required = False,
       default  = 1,
-      help     = "Number of cores on which to carry out analysis")
+      help     = "Number of cores on which to carry out analysis (default: 1)")
 
     arg_groups["output"].add_argument(
       "-attrs",
       type     = str,
       required = False,
       nargs    = "*",
-      metavar  = "KEY VALUE", 
+      metavar  = "KEY VALUE",
       help     = "Attributes to add to dataset (optional)")
     arg_groups["output"].add_argument(
       "--force",
@@ -59,6 +62,10 @@ class Secondary_Block_Generator(Block_Generator):
     Generator class that yields blocks of analysis
     """
     def __init__(self, inputs, output, force = False, **kwargs):
+        """
+        .. todo:
+            - Support multiple output datasets
+        """
         from warnings import warn
         from h5py import File as h5
 
