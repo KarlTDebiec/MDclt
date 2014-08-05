@@ -24,8 +24,8 @@ if __name__ == "__main__":
 
     from MDclt.secondary import pmf
     pmf.add_parser(tool_subparsers)
-    #from MDclt.secondary import association
-    #association.add_parser(subparsers_tools)
+    from MDclt.secondary import association
+    association.add_parser(tool_subparsers)
 
     # Parse arguments
     kwargs = vars(parser.parse_args())

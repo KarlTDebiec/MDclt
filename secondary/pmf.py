@@ -179,7 +179,9 @@ class Hist_Block(PMF_Block):
         """
         # Action
         self.bins = bins
+
         super(Hist_Block, self).__init__(**kwargs)
+
     def __call__(self, **kwargs):
         """
         """
@@ -195,6 +197,7 @@ class KDE_Block(PMF_Block):
         # Action
         self.grid      = np.squeeze(np.array(np.array(eval(grid))))
         self.bandwidth = bandwidth
+
         super(KDE_Block, self).__init__(**kwargs)
 
     def __call__(self, **kwargs):
@@ -209,14 +212,8 @@ class KDE_Block(PMF_Block):
           self.coord.flatten(),
           bw_method = self.bandwidth / self.coord.flatten().std(ddof = 1))
         pdf = kde.evaluate(self.grid)
-        
-        #from sklearn.neighbors import KernelDensity
-        #kde      = KernelDensity(bandwidth = self.bandwidth)
-        #kde.fit(self.coord.flatten()[:, np.newaxis])
-        #log_pdf  = kde.score_samples(self.grid[:, np.newaxis])
-        #pdf      = np.exp(log_pdf) 
 
-        pdf     *= n_frames
+        pdf *= n_frames
         self.datasets[self.out_address]["pdf"] = pdf
 
 class PMF_Block_Generator(Secondary_Block_Generator):
@@ -252,7 +249,7 @@ class PMF_Block_Generator(Secondary_Block_Generator):
         """
         from h5py import File as h5
 
-        if self.incoming_slice is None or self.start_index == self.final_index:
+        if self.incoming_slice is None or self.start_index >= self.final_index:
             raise StopIteration()
         else:
             # Determine slice indexes
@@ -524,7 +521,11 @@ class KDE_Block_Accumulator(PMF_Block_Accumulator):
         """
         # Link to dataset for clarity
         ds = self.datasets[self.out_address]["data"]
+        ##########
+        if self.incoming_slice is None:
+            return
         n_frames = (self.incoming_slice.stop - self.incoming_slice.start)
+        ##########
         ds["probability"] /= n_frames
 
         super(KDE_Block_Accumulator, self).close(x = ds["x"])
