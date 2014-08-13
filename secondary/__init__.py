@@ -29,7 +29,7 @@ def add_parser(subparsers, **kwargs):
       "-log",
       type     = str,
       required = True,
-      nargs    = "*",
+      nargs    = "+",
       metavar  = ("H5_FILE", "ADDRESS"),
       action   = overridable_defaults(nargs = 2, defaults = {1: "log"}),
       help     = "H5 file and optionally address from which to load " + 
@@ -59,7 +59,7 @@ def add_parser(subparsers, **kwargs):
 ################################### CLASSES ####################################
 class Secondary_Block_Generator(Block_Generator):
     """
-    Generator class that yields blocks of analysis
+    Generator class; yields blocks of analysis
     """
     def __init__(self, inputs, output, force = False, **kwargs):
         """

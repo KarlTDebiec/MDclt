@@ -101,9 +101,8 @@ class Block_Generator(object):
 
 class Block_Accumulator(object):
     """
-    Coroutine class used to accumulate Blocks of data and perform analysis once
-    the complete dataset is present; may also act as a Block itself and be
-    added by a Block_Acceptor
+    Coroutine class; accumulates Blocks of data and performs analysis
+    once complete dataset is present; may then be sent to a Block_Acceptor
     """
     def __init__(self, **kwargs):
         """

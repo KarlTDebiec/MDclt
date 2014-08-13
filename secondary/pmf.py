@@ -1,6 +1,6 @@
 #!/usr/bin/python
 #   MDclt.secondary.Pmf.py
-#   Written by Karl Debiec on 12-08-15, last updated by Karl Debiec on 14-08-04
+#   Written by Karl Debiec on 12-08-15, last updated by Karl Debiec on 14-08-12
 """
 Classes for calculation of potential of mean force
 
@@ -10,6 +10,11 @@ Classes for calculation of potential of mean force
       to 2 * N arguments, same for -bins)
     - Support ignoring portion of dataset
     - Calculate and print minimum, POI, desolvation barrier, etc.
+    - Clear out *args; never likely to use
+    - If h5 infile contains single address, just use that automatically
+    - Select KDE bandwidth
+    - Set frames_per_block manually
+    - Add serial flag to all secondary analyses
 """
 ################################### MODULES ####################################
 import os, sys
@@ -31,19 +36,20 @@ def add_parser(tool_subparsers, **kwargs):
 
     tool_subparser = tool_subparsers.add_parser(
       name     = "pmf",
-      help     = "Calculates potential of mean force")
+      help     = "Calculates potential of mean force along a coordinate")
     pdf_subparsers = tool_subparser.add_subparsers(
-      dest = "pdf",
+      dest        = "pdf",
       description = "")
 
     hist_subparser = secondary.add_parser(pdf_subparsers,
       name = "hist",
-      help = "Estimates probability density function using a histogram")
+      help = "Calculates potential of mean force along a coordinate using a " +
+             "histogram estimate for the probability density function")
     
     kde_subparser  = secondary.add_parser(pdf_subparsers,
       name = "kde",
-      help = "Estimates probability density function using a kernal density " +
-             "estimate")
+      help = "Calculates potential of mean force along a coordinate using a " +
+             "kernal density estimate for the probability density function")
 
     arg_groups = {
         hist_subparser: {ag.title: ag for ag in hist_subparser._action_groups},
@@ -82,9 +88,9 @@ def add_parser(tool_subparsers, **kwargs):
           "-zero_point",
           type     = str,
           required = False,
-          help     = "Point at which to adjust PMF to 0; " + \
+          help     = "Point at which to shift PMF to 0; " + \
                      "alternatively range of points (e.g. 10-12) " + \
-                     "at which to adjust average to 0 (optional)")
+                     "over which to adjust average to 0 (optional)")
         arg_groups[pdf_subparser]["action"].add_argument(
           "-temperature",
           type     = str,
@@ -110,13 +116,22 @@ def add_parser(tool_subparsers, **kwargs):
 
 def command_line(block_generator_class, block_accumulator_class, **kwargs):
     """
-    Provides command line functionality for this analysis
+    Generates function for command line action
 
     **Arguments:**
-        :*n_cores*: Number of cores to use
+        :*block_generator_class*:   Class to be used for block
+                                    generation
+        :*block_accumulator_class*: Class to be used for block
+                                    accumulation
     """
 
     def func(n_cores = 1, **kwargs):
+        """
+        Function for command line action
+
+        **Arguments:**
+            :*n_cores*:                 Number of cores to use
+        """
         from multiprocessing import Pool
 
         block_generator   = block_generator_class(**kwargs)
@@ -126,17 +141,16 @@ def command_line(block_generator_class, block_accumulator_class, **kwargs):
                               **kwargs)
         block_accumulator.next()
 
-        # Serial
-        # for block in block_generator:
-        #     block()
-        #     block_accumulator.send(block)
-
-        # Parallel (processes)
-        pool = Pool(n_cores)
-        for block in pool.imap_unordered(pool_director, block_generator):
-            block_accumulator.send(block)
-        pool.close()
-        pool.join()
+        if n_cores == 1:                # Serial
+            for block in block_generator:
+                block()
+                block_accumulator.send(block)
+        else:                           # Parallel (processes)
+            pool = Pool(n_cores)
+            for block in pool.imap_unordered(pool_director, block_generator):
+                block_accumulator.send(block)
+            pool.close()
+            pool.join()
 
         block_accumulator.close()
 
@@ -149,7 +163,7 @@ def command_line(block_generator_class, block_accumulator_class, **kwargs):
 ################################### CLASSES ####################################
 class PMF_Block(Block):
     """
-    Independent block of analysis
+    Independent block of analysis for potential of mean force
     """
     def __init__(self, coord, out_address, slc, attrs = {}, **kwargs):
         """
@@ -161,21 +175,37 @@ class PMF_Block(Block):
             :*out_address*: Address of dataset within h5 file
             :*slc*:         Indexes of simulation frames to which this block
                             corresponds
+            :*attrs*:       Attributes to add to dataset
         """
         from collections import OrderedDict
+
         # Input
         self.coord = coord
+
         # Output
         self.out_address = out_address
         self.datasets    = OrderedDict(
           {out_address: dict(slc = slc, attrs = attrs)})
+
         super(PMF_Block, self).__init__(**kwargs)
 
 class Hist_Block(PMF_Block):
     """
+    Independent block of analysis for potential of mean force
+    calculation, using a histogram estimate for the probability
+    density function
     """
     def __init__(self, bins, **kwargs):
         """
+        Initializes block of analysis
+
+        **Arguments:**
+            :*coord*:       Coordinates
+            :*bins*:        Bins in which to classify coordinates
+            :*out_address*: Address of dataset within h5 file
+            :*slc*:         Indexes of simulation frames to which this block
+                            corresponds
+            :*attrs*:       Attributes to add to dataset
         """
         # Action
         self.bins = bins
@@ -184,41 +214,55 @@ class Hist_Block(PMF_Block):
 
     def __call__(self, **kwargs):
         """
+        Runs block of analysis
         """
         hist, _ = np.histogram(self.coord, self.bins)
+
         self.datasets[self.out_address]["count"] = hist
 
 class KDE_Block(PMF_Block):
     """
+    Independent block of analysis for potential of mean force
+    calculation, using a kernel density estimate for the probability
+    density function
     """
     def __init__(self, grid, bandwidth, **kwargs):
         """
+        Initializes block of analysis
+
+        **Arguments:**
+            :*coord*:       Coordinates
+            :*grid*:        Grid on which to calculate pdf
+            :*bandwidth*:   Kernel bandwidth
+            :*out_address*: Address of dataset within h5 file
+            :*slc*:         Indexes of simulation frames to which this block
+                            corresponds
+            :*attrs*:       Attributes to add to dataset
         """
         # Action
-        self.grid      = np.squeeze(np.array(np.array(eval(grid))))
+        self.grid      = grid
         self.bandwidth = bandwidth
 
         super(KDE_Block, self).__init__(**kwargs)
 
     def __call__(self, **kwargs):
         """
+        Runs block of analysis
         """
-
-        n_frames = (self.datasets[self.out_address]["slc"].stop -
-                    self.datasets[self.out_address]["slc"].start)
-
         from scipy.stats import gaussian_kde
+
         kde = gaussian_kde(
           self.coord.flatten(),
           bw_method = self.bandwidth / self.coord.flatten().std(ddof = 1))
         pdf = kde.evaluate(self.grid)
+        pdf /= np.nansum(pdf)
 
-        pdf *= n_frames
         self.datasets[self.out_address]["pdf"] = pdf
 
 class PMF_Block_Generator(Secondary_Block_Generator):
     """
-    Generator class that yields blocks of analysis
+    Generator class; yields blocks of analysis for potential of mean
+    force calculation
     """
     def __init__(self, log, coord, output, **kwargs):
         """
@@ -227,11 +271,10 @@ class PMF_Block_Generator(Secondary_Block_Generator):
         **Arguments:**
             :*log*:    Simulation log
             :*coord*:  Coordinates used to generate pmf
-            :*output*: List including path to h5 file and address within h5 file
-            :*bins*:   Bins in which to classify coordinates
+            :*output*: List including path to h5 file and address
+                       within h5 file
             :*force*:  Run analysis even if no new data is present
         """
-
         # Input
         self.log_path,   self.log_address   = log
         self.coord_path, self.coord_address = coord
@@ -274,9 +317,21 @@ class PMF_Block_Generator(Secondary_Block_Generator):
 
 class Hist_Block_Generator(PMF_Block_Generator):
     """
+    Generator class; yields blocks of analysis for potential of mean
+    force calculation, using a histogram estimate for the probability
+    density function
     """
     def __init__(self, bins, **kwargs):
         """
+        Initializes generator
+
+        **Arguments:**
+            :*log*:    Simulation log
+            :*coord*:  Coordinates used to generate pmf
+            :*output*: List including path to h5 file and address
+                       within h5 file
+            :*bins*:   Bins in which to classify coordinates
+            :*force*:  Run analysis even if no new data is present
         """
         # Action
         self.block_class      = Hist_Block
@@ -287,37 +342,54 @@ class Hist_Block_Generator(PMF_Block_Generator):
 
 class KDE_Block_Generator(PMF_Block_Generator):
     """
+    Generator class; yields blocks of analysis for potential of mean
+    force calculation, using a kernel density estimate for the
+    probability density function
     """
     def __init__(self, grid, bandwidth, **kwargs):
         """
+        Initializes generator
+
+        **Arguments:**
+            :*log*:       Simulation log
+            :*coord*:     Coordinates used to generate pmf
+            :*grid*:      Grid on which to calculate pdf
+            :*bandwidth*: Kernel bandwidth
+            :*output*:    List including path to h5 file and address
+                          within h5 file
+            :*force*:     Run analysis even if no new data is present
         """
         # Action
         self.block_class      = KDE_Block
-        self.block_kwargs     = dict(grid = grid, bandwidth = bandwidth)
-        self.frames_per_block = 100
+        self.block_kwargs     = dict(
+          grid      = np.squeeze(np.array(eval(grid))),
+          bandwidth = bandwidth)
+        self.frames_per_block = 1000
 
         super(KDE_Block_Generator, self).__init__(**kwargs)
 
 class PMF_Block_Accumulator(Block_Accumulator):
     """
-    Coroutine class used to accumulate Blocks of data and perform
-    analysis once the complete data is present; also may act as a Block
-    itself
+    Coroutine class; accumulates Blocks of data and performs analysis
+    once complete dataset is present; may then be sent to a Block_Acceptor
     """
-    def __init__(self, 
-                 preexisting_slice, incoming_slice,
-                 temperature, zero_point,
-                 output, **kwargs):
+    def __init__(self, preexisting_slice, incoming_slice, temperature,
+                 zero_point, output, **kwargs):
         """
-        Initializes wrapped function
+        Initializes accumulator
 
         **Arguments:**
-            :*bins*:        Bins in which to classify coordinates
-            :*temperature*: Simulation temperature used to calculate pmf
-            :*zero_point*:  Point to adjust pmf to zero, or range of
-                            points over which to adjust average to zero
-            :*output*: List including path to h5 file and address
-                            within h5 file
+            :*preexisting_slice*: slice containing frame indices whose results
+                                  were included in *output* h5 file before
+                                  this invocation of program
+            :*incoming_slice*:    slice containting frame indices whose results
+                                  are expected to be added to *output* h5 file
+                                  after this invocation of program
+            :*temperature*:       Simulation temperature used to calculate pmf
+            :*zero_point*:        Point to shift pmf to zero, or range of
+                                  points over which to shift average to zero
+            :*output*:            List including path to h5 file and address
+                                  within h5 file
         """
         from h5py import File as h5
         from collections import OrderedDict
@@ -326,9 +398,11 @@ class PMF_Block_Accumulator(Block_Accumulator):
         self.preexisting_slice = preexisting_slice
         self.incoming_slice    = incoming_slice
         self.received_slices   = []
+
         # Action
         self.temperature = temperature
         self.zero_point  = zero_point
+
         # Output
         self.out_path    = output[0]
         self.out_address = os.path.normpath(output[1] + "/pmf")
@@ -397,18 +471,27 @@ class PMF_Block_Accumulator(Block_Accumulator):
 
 class Hist_Block_Accumulator(PMF_Block_Accumulator):
     """
+    Coroutine class; accumulates Blocks of data and performs analysis
+    once complete dataset is present; may then be sent to a Block_Acceptor
     """
     def __init__(self, bins, attrs = {}, **kwargs):
         """
-        Initializes wrapped function
+        Initializes accumulator
 
         **Arguments:**
-            :*bins*:        Bins in which to classify coordinates
-            :*temperature*: Simulation temperature used to calculate pmf
-            :*zero_point*:  Point to adjust pmf to zero, or range of
-                            points over which to adjust average to zero
-            :*output*: List including path to h5 file and address
-                            within h5 file
+            :*preexisting_slice*: slice containing frame indices whose results
+                                  were included in *output* h5 file before
+                                  this invocation of program
+            :*incoming_slice*:    slice containting frame indices whose results
+                                  are expected to be added to *output* h5 file
+                                  after this invocation of program
+            :*bins*:              Bins used to calculate histogram
+            :*temperature*:       Simulation temperature used to calculate pmf
+            :*zero_point*:        Point to shift pmf to zero, or range of
+                                  points over which to shift average to zero
+            :*output*:            List including path to h5 file and address
+                                  within h5 file
+            :*attrs*:             Attributes to add to dataset
         """
         from h5py import File as h5
 
@@ -418,7 +501,7 @@ class Hist_Block_Accumulator(PMF_Block_Accumulator):
         super(Hist_Block_Accumulator, self).__init__(**kwargs)
 
         # Prepare dataset
-        ds= np.zeros(self.bins.size - 1,
+        ds = np.zeros(self.bins.size - 1,
           dtype = [("lower bound", "f4"), ("center",      "f4"),
                    ("upper bound", "f4"), ("count",       "i4"),
                    ("probability", "f8"), ("free energy", "f8"),
@@ -442,13 +525,17 @@ class Hist_Block_Accumulator(PMF_Block_Accumulator):
 
     def receive_block(self, **kwargs):
         """
-        Accumulates received Blocks
+        Accumulates bin counts from recieved Blocks
         """
         ds = self.datasets[self.out_address]["data"]
         while True:
-            block = (yield)
-            ds["count"] += block.datasets[self.out_address]["count"]
-            self.receive_slice(block.datasets[self.out_address]["slc"])
+            block       = (yield)
+            block_count = block.datasets[self.out_address]["count"]
+            block_slice = block.datasets[self.out_address]["slc"]
+
+            ds["count"] += block_count
+            self.receive_slice(block_slice)
+
             print("Total incoming frames: [{0}:{1}]  ".format(
               self.incoming_slice.start, self.incoming_slice.stop) +
               "Received frames: {0}".format("".join(
@@ -457,22 +544,47 @@ class Hist_Block_Accumulator(PMF_Block_Accumulator):
 
     def close(self, **kwargs):
         """
+        Estimates probability density function from histogram and
+        passes on to superclass, which calculates free energy and
+        potential of mean force
         """
         # Link to dataset for clarity
         ds = self.datasets[self.out_address]["data"]
 
-        # Calculate probability
-        ds["probability"] = np.array(ds["count"],
-          dtype = np.float32) / np.sum(ds["count"])
-        ds["probability"][ds["probability"] == 0.0] = np.nan
-
-        super(Hist_Block_Accumulator, self).close(x = ds["center"], **kwargs)
+        # Calculate final probability and PMF
+        if self.incoming_slice is None:
+            self.datasets = {}
+        else:
+            ds["probability"] = np.array(ds["count"],
+              dtype = np.float32) / np.sum(ds["count"])
+            ds["probability"][ds["probability"] == 0.0] = np.nan
+            super(Hist_Block_Accumulator, self).close(x = ds["center"],
+              **kwargs)
 
 class KDE_Block_Accumulator(PMF_Block_Accumulator):
     """
+    Coroutine class; accumulates Blocks of data and performs analysis
+    once complete dataset is present; may then be sent to a Block_Acceptor
     """
     def __init__(self, grid, bandwidth, attrs = {}, **kwargs):
         """
+        Initializes accumulator
+
+        **Arguments:**
+            :*preexisting_slice*: slice containing frame indices whose results
+                                  were included in *output* h5 file before
+                                  this invocation of program
+            :*incoming_slice*:    slice containting frame indices whose results
+                                  are expected to be added to *output* h5 file
+                                  after this invocation of program
+            :*grid*:              Grid on which to calculate pdf
+            :*bandwidth*:         Kernel bandwidth
+            :*temperature*:       Simulation temperature used to calculate pmf
+            :*zero_point*:        Point to shift pmf to zero, or range of
+                                  points over which to shift average to zero
+            :*output*:            List including path to h5 file and address
+                                  within h5 file
+            :*attrs*:             Attributes to add to dataset
         """
         from h5py import File as h5
         
@@ -485,31 +597,41 @@ class KDE_Block_Accumulator(PMF_Block_Accumulator):
         ds = np.zeros(self.grid.size,
           dtype = [("x",           "f4"), ("probability", "f8"),
                    ("free energy", "f4"), ("pmf",         "f4")])
-        #if self.preexisting_slice is not None:
-        #    with h5(self.out_path) as out_h5:
-        #        preexisting_ds     = np.array(out_h5[self.out_address])
-        #        ds["x"]            = preexisting_ds["x"]
-        #        ds["probability"]  = preexisting_ds["probability"]
-        #        ds["probability"] *= (self.preexisting_slice.stop -
-        #          self.preexisting_slice.start)
-        #else:
-        #   ds["x"] = self.grid
-        #########
-        ds["x"] = self.grid
-        ##########
+        if self.preexisting_slice is not None:
+            with h5(self.out_path) as out_h5:
+                preexisting_ds     = np.array(out_h5[self.out_address])
+                ds["x"]            = preexisting_ds["x"]
+                ds["probability"]  = preexisting_ds["probability"]
+                self.n_frames_received = (self.preexisting_slice.stop -
+                  self.preexisting_slice.start)
+        else:
+            ds["x"] = self.grid
+            self.n_frames_received = 0
         attrs["bandwidth"] = bandwidth
 
         self.datasets = {self.out_address: dict(data = ds, attrs = attrs)}
 
     def receive_block(self, **kwargs):
         """
-        Accumulates received Blocks
+        Accumulates probability density functions from recieved Blocks
         """
         ds = self.datasets[self.out_address]["data"]
         while True:
-            block = (yield)
-            ds["probability"] += block.datasets[self.out_address]["pdf"]
-            self.receive_slice(block.datasets[self.out_address]["slc"])
+            block       = (yield)
+            block_pdf   = block.datasets[self.out_address]["pdf"]
+            block_slice = block.datasets[self.out_address]["slc"]
+
+            # Weigh current and incoming pdfs appropriately; probably needs
+            #   a long-term fix to ensure low error, but for now this is fine
+            ds["probability"] = (
+              (ds["probability"] * self.n_frames_received)
+              + (block_pdf * (block_slice.stop - block_slice.start))
+              ) / (self.n_frames_received 
+              + (block_slice.stop - block_slice.start))
+
+            self.n_frames_received += (block_slice.stop - block_slice.start)
+            self.receive_slice(block_slice)
+
             print("Total incoming frames: [{0}:{1}]  ".format(
               self.incoming_slice.start, self.incoming_slice.stop) +
               "Received frames: {0}".format("".join(
@@ -518,15 +640,15 @@ class KDE_Block_Accumulator(PMF_Block_Accumulator):
 
     def close(self, **kwargs):
         """
+        Passes probability density function on to superclass, which
+        calculates free energy and potential of mean force
         """
         # Link to dataset for clarity
         ds = self.datasets[self.out_address]["data"]
-        ##########
-        if self.incoming_slice is None:
-            return
-        n_frames = (self.incoming_slice.stop - self.incoming_slice.start)
-        ##########
-        ds["probability"] /= n_frames
 
-        super(KDE_Block_Accumulator, self).close(x = ds["x"])
+        # Calculate final probability and PMF
+        if self.incoming_slice is None:
+            self.datasets = {}
+        else:
+            super(KDE_Block_Accumulator, self).close(x = ds["x"], **kwargs)
 
