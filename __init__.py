@@ -164,7 +164,12 @@ class Block_Acceptor(Block_Accumulator):
         """
         Initializes wrapped function
         """
-        self.out_path = kwargs.get("out_path", kwargs.pop("output")[0])
+        if   "out_path" in kwargs:
+            self.out_path = kwargs.pop("out_path")
+        elif "output" in kwargs:
+            self.out_path = kwargs.pop("output")[0]
+        else:
+            raise Exception()
         super(Block_Acceptor, self).__init__(*args, **kwargs)
 
     def receive_block(self, **kwargs):
