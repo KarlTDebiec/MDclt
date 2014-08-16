@@ -1,6 +1,6 @@
 #!/usr/bin/python
-#   MDclt.secondary.Pmf.py
-#   Written by Karl Debiec on 12-08-15, last updated by Karl Debiec on 14-08-12
+#   MDclt.secondary.pmf.py
+#   Written by Karl Debiec on 12-08-15, last updated by Karl Debiec on 14-08-15
 """
 Classes for calculation of potential of mean force
 
@@ -37,16 +37,16 @@ def add_parser(tool_subparsers, **kwargs):
     tool_subparser = tool_subparsers.add_parser(
       name     = "pmf",
       help     = "Calculates potential of mean force along a coordinate")
-    pdf_subparsers = tool_subparser.add_subparsers(
-      dest        = "pdf",
+    method_subparsers = tool_subparser.add_subparsers(
+      dest        = "method",
       description = "")
 
-    hist_subparser = secondary.add_parser(pdf_subparsers,
+    hist_subparser = secondary.add_parser(method_subparsers,
       name = "hist",
       help = "Calculates potential of mean force along a coordinate using a " +
              "histogram estimate for the probability density function")
-    
-    kde_subparser  = secondary.add_parser(pdf_subparsers,
+
+    kde_subparser  = secondary.add_parser(method_subparsers,
       name = "kde",
       help = "Calculates potential of mean force along a coordinate using a " +
              "kernal density estimate for the probability density function")
@@ -56,8 +56,8 @@ def add_parser(tool_subparsers, **kwargs):
         kde_subparser:  {ag.title: ag for ag in kde_subparser._action_groups}}
 
     # Input
-    for pdf_subparser in [hist_subparser, kde_subparser]:
-        arg_groups[pdf_subparser]["input"].add_argument(
+    for method_subparser in [hist_subparser, kde_subparser]:
+        arg_groups[method_subparser]["input"].add_argument(
           "-coord",
           type     = str,
           required = True,
@@ -83,23 +83,23 @@ def add_parser(tool_subparsers, **kwargs):
       type     = float,
       required = True,
       help     = "Bandwidth of kernel density estimate")
-    for pdf_subparser in [hist_subparser, kde_subparser]:
-        arg_groups[pdf_subparser]["action"].add_argument(
+    for method_subparser in [hist_subparser, kde_subparser]:
+        arg_groups[method_subparser]["action"].add_argument(
           "-zero_point",
           type     = str,
           required = False,
           help     = "Point at which to shift PMF to 0; " + \
                      "alternatively range of points (e.g. 10-12) " + \
                      "over which to adjust average to 0 (optional)")
-        arg_groups[pdf_subparser]["action"].add_argument(
+        arg_groups[method_subparser]["action"].add_argument(
           "-temperature",
           type     = str,
           default  = 298.0,
           help     = "System temperature (default: %(default)s)")
 
     # Output
-    for pdf_subparser in [hist_subparser, kde_subparser]:
-        arg_groups[pdf_subparser]["output"].add_argument(
+    for method_subparser in [hist_subparser, kde_subparser]:
+        arg_groups[method_subparser]["output"].add_argument(
           "-output",
           type     = str,
           required = True,
@@ -158,6 +158,7 @@ def command_line(block_generator_class, block_accumulator_class, **kwargs):
         block_acceptor.next()
         block_acceptor.send(block_accumulator)
         block_acceptor.close()
+
     return func
 
 ################################### CLASSES ####################################

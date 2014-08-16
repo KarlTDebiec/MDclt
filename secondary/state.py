@@ -1,6 +1,6 @@
 #!/usr/bin/python
-#   MDclt.secondary.Association.py
-#   Written by Karl Debiec on 12-08-15, last updated by Karl Debiec on 14-08-04
+#   MDclt.secondary.state.py
+#   Written by Karl Debiec on 12-08-15, last updated by Karl Debiec on 14-08-15
 """
 Classes for analysis of molecular association
 
@@ -72,7 +72,7 @@ def fit_curve(fit_func = "single_exponential", **kwargs):
 
         return locals()[fit_func](**kwargs)
 
-def add_parser(subparsers, *args, **kwargs):
+def add_parser(tool_subparsers, **kwargs):
     """
     Adds subparser for this analysis to a nascent argument parser
 
@@ -81,77 +81,182 @@ def add_parser(subparsers, *args, **kwargs):
         :*args*:       Passed to subparsers.add_parser(...)
         :*kwargs*:     Passed to subparsers.add_parser(...)
     """
-    subparser  = secondary.add_parser(subparsers,
-      name     = "association",
-      help     = "Analyzes molecular association")
-    arg_groups = {ag.title:ag for ag in subparser._action_groups}
+    from MDclt import overridable_defaults
 
-    arg_groups["input"].add_argument(
+    tool_subparser = tool_subparsers.add_parser(
+      name     = "state",
+      help     = "Calculates probability of and exchange between states")
+    method_subparsers = tool_subparser.add_subparsers(
+      dest        = "method",
+      description = "")
+
+    ct_subparser = secondary.add_parser(method_subparsers,
+      name = "ct",
+      help = "Calculates probability of and exchange between states " +
+             "by classifying the trajectory based on its position " +
+             "along a coordinate")
+
+    pdf_subparser  = secondary.add_parser(method_subparsers,
+      name = "pdf",
+      help = "Calculates probability of states by integrating the"
+             "probability density function along a coordinate")
+
+    arg_groups = {
+        ct_subparser:  {ag.title: ag for ag in ct_subparser._action_groups},
+        pdf_subparser: {ag.title: ag for ag in pdf_subparser._action_groups}}
+
+    # Input
+    arg_groups[ct_subparser]["input"].add_argument(
       "-coord",
       type     = str,
       required = True,
       nargs    = 2,
       metavar  = ("H5_FILE", "ADDRESS"),
       help     = "H5 file and address from which to load coordinate")
+    arg_groups[pdf_subparser]["input"].add_argument(
+      "-pdf",
+      type     = str,
+      required = True,
+      nargs    = 2,
+      metavar  = ("H5_FILE", "ADDRESS"),
+      help     = "H5 file and address from which to load probability " +
+                 "density function (typically as part of potential of " +
+                 "mean force dataset)")
 
-    arg_groups["action"].add_argument(
+    # Action
+    arg_groups[ct_subparser]["action"].add_argument(
       "-bound",
       type     = float,
       required = True,
       help     = "Bound state cutoff along coordinate")
-    arg_groups["action"].add_argument(
+    arg_groups[ct_subparser]["action"].add_argument(
       "-unbound",
       type     = float,
+      required = False,
+      help     = "Unbound state cutoff along coordinate " +
+                 "(default: same as bound cutoff)")
+    arg_groups[pdf_subparser]["action"].add_argument(
+      "-bound",
+      type     = float,
       required = True,
-      help     = "Unbound state cutoff along coordinate")
+      help     = "Bound state cutoff along coordinate")
 
-    arg_groups["output"].add_argument(
-      "-output",
-      type     = str,
-      required = True,
-      metavar  = "H5_FILE",
-      help     = "H5 file in which to output data")
+    # Output
+    for method_subparser in [ct_subparser, pdf_subparser]:
+        arg_groups[method_subparser]["output"].add_argument(
+          "-output",
+          type     = str,
+          required = True,
+          nargs    = "+",
+          action   = overridable_defaults(nargs = 2, defaults = {1: "pmf"}),
+          metavar  = ("H5_FILE", "ADDRESS"),
+          help     = "H5 file and optionally address in which to output data " +
+                     "(default ADDRESS: /)")
 
-    subparser.set_defaults(analysis = command_line)
+    ct_subparser.set_defaults(analysis   = ct_command_line)
+    pdf_subparser.set_defaults(analysis = pdf_command_line)
 
-def command_line(n_cores = 1, **kwargs):
+def ct_command_line(**kwargs):
     """
-    Provides command line functionality for this analysis
+    Generates function for command line action
 
     **Arguments:**
-        :*n_cores*: Number of cores to use
-
-    .. todo:
-        - Figure out syntax to get this into MDclt.primary
+        :*block_generator_class*:   Class to be used for block
+                                    generation
+        :*block_accumulator_class*: Class to be used for block
+                                    accumulation
     """
-    from multiprocessing import Pool
 
-    block_generator   = Association_Block_Generator(**kwargs)
-    block_accumulator = Association_Block_Accumulator(
-                          preexisting_slice = block_generator.preexisting_slice,
-                          incoming_slice    = block_generator.incoming_slice,
-                          **kwargs)
-    block_accumulator.next()
+    def func(n_cores = 1, **kwargs):
+        """
+        Function for command line action
 
-    # Serial
-#    for block in block_generator:
-#        block()
-#        block_accumulator.send(block)
+        **Arguments:**
+            :*n_cores*:                 Number of cores to use
+        """
+        from multiprocessing import Pool
 
-    # Parallel (Processes)
-    pool = Pool(n_cores)
-    for block in pool.imap_unordered(pool_director, block_generator):
-        block_accumulator.send(block)
-    pool.close()
-    pool.join()
+        block_generator   = block_generator_class(**kwargs)
+        block_accumulator = block_accumulator_class(
+          preexisting_slice = block_generator.preexisting_slice,
+          incoming_slice    = block_generator.incoming_slice,
+                              **kwargs)
+        block_accumulator.next()
 
-    block_accumulator.close()
-    block_acceptor = Block_Acceptor(out_path = kwargs["output"], **kwargs)
+        if n_cores == 1:                # Serial
+            for block in block_generator:
+                block()
+                block_accumulator.send(block)
+        else:                           # Parallel (processes)
+            pool = Pool(n_cores)
+            for block in pool.imap_unordered(pool_director, block_generator):
+                block_accumulator.send(block)
+            pool.close()
+            pool.join()
+
+        block_accumulator.close()
+
+        block_acceptor = Block_Acceptor(**kwargs)
+        block_acceptor.next()
+        block_acceptor.send(block_accumulator)
+        block_acceptor.close()
+
+    return func
+
+def pdf_command_line(**kwargs):
+    """
+    """
+    block = PDF_Block(**kwargs)
+    
+    block_acceptor = Block_Acceptor(**kwargs)
     block_acceptor.next()
-    block_acceptor.send(block_accumulator)
+    block_acceptor.send(block)
     block_acceptor.close()
 
 ################################### CLASSES ####################################
+class State_Block(Block):
+    """
+    """
+    def __init__(self, **kwargs):
+        """
+        """
+        pass
+
+class PDF_Block(State_Block):
+    """
+    """   
+    def __init__(self, pdf, output, bound, **kwargs):
+        """
+        """
+        from h5py import File as h5
+
+        # Input
+        self.pdf_path, self.pdf_address = pdf
+
+        # Action
+        self.bound = bound
+
+        # Output
+        self.out_path, self.out_address = output
+
+        with h5(self.pdf_path) as pdf_h5:
+            dtype   = pdf_h5[self.pdf_address].dtype
+            x       = np.array(pdf_h5[self.pdf_address])["x"]
+            pdf     = np.array(pdf_h5[self.pdf_address])["probability"]
+            attrs   = dict(pdf_h5[self.pdf_address].attrs)
+        index = np.nanargmin(np.abs(x - bound))
+        print(np.sum(pdf[:index]))
+        self.datasets = {
+          self.out_address: {
+            "data": np.array([(np.sum(pdf[:index]),)], dtype = [("P", "f4")]),
+            "attrs": {"bound cutoff": bound,
+                      "slice": str(slice)}}}
+
+    def __call__(self, **kwargs):
+        """
+        """
+        pass
+
 class Association_Block(Block):
     """
     """

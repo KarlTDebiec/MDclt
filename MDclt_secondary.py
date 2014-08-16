@@ -1,6 +1,6 @@
 #!/usr/bin/python
 #   MDclt_secondary.py
-#   Written by Karl Debiec on 14-07-06, last updated by Karl Debiec on 14-08-02
+#   Written by Karl Debiec on 14-07-06, last updated by Karl Debiec on 14-08-15
 """
 Command Line Tool to manage secondary analysis of molecular dynamics simulations
 
@@ -24,8 +24,8 @@ if __name__ == "__main__":
 
     from MDclt.secondary import pmf
     pmf.add_parser(tool_subparsers)
-    from MDclt.secondary import association
-    association.add_parser(tool_subparsers)
+    from MDclt.secondary import state
+    state.add_parser(tool_subparsers)
 
     # Parse arguments
     kwargs = vars(parser.parse_args())
