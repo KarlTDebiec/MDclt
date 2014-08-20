@@ -133,17 +133,16 @@ def command_line(n_cores = 1, **kwargs):
                           **kwargs)
     block_accumulator.next()
 
-    # Serial
-#    for block in block_generator:
-#        block()
-#        block_accumulator.send(block)
-
-    # Parallel (Processes)
-    pool = Pool(n_cores)
-    for block in pool.imap_unordered(pool_director, block_generator):
-        block_accumulator.send(block)
-    pool.close()
-    pool.join()
+    if n_cores == 1:                # Serial
+        for block in block_generator:
+            block()
+            block_accumulator.send(block)
+    else:                           # Parallel (processes)
+        pool = Pool(n_cores)
+        for block in pool.imap_unordered(pool_director, block_generator):
+            block_accumulator.send(block)
+        pool.close()
+        pool.join()
 
     block_accumulator.close()
     block_acceptor = Block_Acceptor(out_path = kwargs["output"], **kwargs)
@@ -329,7 +328,7 @@ class Association_Block_Generator(Secondary_Block_Generator):
     def __init__(self,
                  log, coord,
                  bound, unbound,
-                 output, force = False, **kwargs):
+                 output, **kwargs):
         """
         Initializes generator
 
