@@ -192,6 +192,8 @@ class PDist_Block_Generator(secondary.Secondary_Block_Generator):
                        within h5 file
             :*force*:  Run analysis even if no new data is present
         """
+        from MDclt import clean_path
+
         # Input
         self.coord_path, self.coord_address = coord
         self.inputs = [(self.coord_path, self.coord_address)]
@@ -200,7 +202,7 @@ class PDist_Block_Generator(secondary.Secondary_Block_Generator):
         self.frames_per_block = frames_per_block
 
         # Output
-        output[1]    = output[1].rstrip("pdist")
+        output[1]    = clean_path(output[1], strip = ["pdist", "blocks"])
         self.outputs = [(output[0], os.path.normpath(output[1] + "/pdist")),
                         (output[0], os.path.normpath(output[1] + "/blocks"))]
 
