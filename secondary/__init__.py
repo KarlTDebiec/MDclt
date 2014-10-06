@@ -1,6 +1,7 @@
 #!/usr/bin/python
+# -*- coding: utf-8 -*-
 #   MDclt.secondary.__init__.py
-#   Written by Karl Debiec on 14-07-06, last updated by Karl Debiec on 14-08-04
+#   Written by Karl Debiec on 14-07-06, last updated by Karl Debiec on 14-09-30
 """
 Classes and functions for secondary analysis of molecular dynamics simulations
 """
@@ -24,16 +25,6 @@ def add_parser(subparsers, **kwargs):
     arg_groups = {"input":  subparser.add_argument_group("input"),
                   "action": subparser.add_argument_group("action"),
                   "output": subparser.add_argument_group("output")}
-
-    arg_groups["input"].add_argument(
-      "-log",
-      type     = str,
-      required = True,
-      nargs    = "+",
-      metavar  = ("H5_FILE", "ADDRESS"),
-      action   = overridable_defaults(nargs = 2, defaults = {1: "log"}),
-      help     = "H5 file and optionally address from which to load " + 
-                 "simulation log (default ADDRESS: log)")
 
     arg_groups["action"].add_argument(
       "-n_cores",
@@ -59,45 +50,76 @@ def add_parser(subparsers, **kwargs):
 ################################### CLASSES ####################################
 class Secondary_Block_Generator(Block_Generator):
     """
-    Generator class; yields blocks of analysis
+    Generator class that prepares blocks of analysis
     """
-    def __init__(self, inputs, output, force = False, **kwargs):
+    def __init__(self, force = False, **kwargs):
         """
-        .. todo:
-            - Support multiple output datasets
+        Initializes generator
+
+        Analyzes inputs, checking which simulation frames each input
+        dataset corresponds to, and setting the expected final dataset
+        slice to the frames shared by all. Analyzes outputs, checking
+        which simulation frames each previously-existing dataset
+        corresponds to, and setting the expected incoming dataset to
+        those available from the input and not present in the output.
+
+        **Arguments:**
+            :*force*:   Overwrite data even if already present
+        """
+        from warnings import warn
+
+        # Input
+        self.get_final_slice(**kwargs)
+
+        # Output
+        self.get_preexisting_slice(force = force, **kwargs)
+
+        # Action
+        self.get_incoming_slice(**kwargs)
+
+        super(Secondary_Block_Generator, self).__init__(force=force, **kwargs)
+
+    def get_final_slice(self, debug = False, **kwargs):
+        """
         """
         from warnings import warn
         from h5py import File as h5
 
-        # Input
-        in_sizes = []
-        for in_path, in_address in inputs:
+        if debug: print(self.inputs)
+
+        in_starts   = []
+        in_stops    = []
+        for in_path, in_address in self.inputs:
             with h5(in_path) as in_h5:
-                in_sizes += [in_h5[in_address].shape[0]]
-        in_sizes = np.array(in_sizes)
-        if np.unique(np.array(in_sizes)).size != 1:
-            warn("Size of input datasets ({0}) inconsistent; ".format(
-              in_shapes) + "using smallest size")
-        self.final_index = np.min(in_sizes)
+                attrs = dict(in_h5[in_address].attrs)
+                if "slice" in attrs:
+                    in_starts += [eval(attrs["slice"]).start]
+                    in_stops  += [eval(attrs["slice"]).stop]
+                else:
+                    warn("'slice' not found in dataset " +
+                      "'{0}:{1}' attributes; ".format(in_path, in_address) +
+                      "assuming first dimension is time")
+                    in_starts += [0]
+                    in_stops  += [in_h5[in_address].shape[0]]
+        in_start = np.max(in_starts)
+        in_stop  = np.min(in_stops)
+        self.final_slice = slice(in_start, in_stop, 1)
 
-        # Output
-        out_path, out_address = output
-        with h5(out_path) as out_h5:
-            if force or not out_address in out_h5:
-                self.start_index       = 0
-                self.preexisting_slice = None
-            else:
-                dataset                = out_h5[out_address]
-                self.preexisting_slice = eval(dataset.attrs["slice"])
-                self.start_index       = self.preexisting_slice.stop
-
-            if self.start_index == self.final_index:
-                self.incoming_slice = None
-            else:
-                self.incoming_slice = slice(self.start_index,
-                                            self.final_index, 1)
-
-        super(Secondary_Block_Generator, self).__init__(
-          force = force, **kwargs)
-
+    def get_incoming_slice(self, **kwargs):
+        """
+        """
+        if self.preexisting_slice is None:
+            self.incoming_slice = self.final_slice
+        elif self.final_slice.stop > self.preexisting_slice.stop:
+            self.incoming_slice = slice(self.preexisting_slice.stop,
+              self.final_slice.stop, 1)
+        elif self.final_slice.stop < self.preexisting_slice.stop:
+            warning = "Preexisting outfile(s) appear to correspond to " + \
+              "a larger slice of frames " + \
+              "({0}) ".format(self.preexisting_slice) + \
+              "than available in infile(s) " + \
+              "({0})".format(self.final_slice)
+            self.incoming_slice = None
+        else:
+            self.incoming_slice = None
 

@@ -1,30 +1,32 @@
 #!/usr/bin/python
 #   MDclt.primary.raw.py
-#   Written by Karl Debiec on 14-06-30, last updated by Karl Debiec on 14-07-17
+#   Written by Karl Debiec on 14-06-30, last updated by Karl Debiec on 14-09-29
 """
 Classes for transfer of data from raw text files to h5
 
 .. todo:
     - Look into improving speed (np.loadtxt or np.genfromtxt may actually be
       preferable)
+    - Alow scaleoffset to be specified
 """
 ################################### MODULES ####################################
 from __future__ import division, print_function
 import os, sys
 import numpy as np
-from MDclt import primary
-from MDclt import Block, Block_Acceptor
+from MDclt import Block, Block_Acceptor, primary
 ################################## FUNCTIONS ###################################
-def add_parser(subparsers, *args, **kwargs):
+def add_parser(tool_subparsers, **kwargs):
     """
     Adds subparser for this analysis to a nascent argument parser
 
     **Arguments:**
-        :*subparsers*: argparse subparsers object to add subparser
-        :*args*:       Passed to subparsers.add_parser(...)
-        :*kwargs*:     Passed to subparsers.add_parser(...)
+        :*tool_subparsers*: argparse subparsers object to add subparser
+        :*args*:            Passed to tool_subparsers.add_parser(...)
+        :*kwargs*:          Passed to tool_subparsers.add_parser(...)
     """
-    subparser  = primary.add_parser(subparsers,
+    from MDclt import overridable_defaults
+
+    subparser  = primary.add_parser(tool_subparsers,
       name     = "raw",
       help     = "Load raw text files")
     arg_groups = {ag.title: ag for ag in subparser._action_groups}
@@ -34,7 +36,7 @@ def add_parser(subparsers, *args, **kwargs):
       type     = int,
       required = False,
       help     = "Number of frames in each file; used to check if new data " +
-                 "is present (optional)")
+                 "is present")
     arg_groups["input"].add_argument(
       "-dimensions",
       type     = int,
@@ -42,6 +44,15 @@ def add_parser(subparsers, *args, **kwargs):
       nargs    = "*",
       help     = "Additional dimensions in dataset; if multidimensional " +
                  "(optional)")
+
+    arg_groups["output"].add_argument(
+      "-output",
+      type     = str,
+      required = True,
+      nargs    = "+",
+      action   = overridable_defaults(nargs = 2, defaults = {1: "/dataset"}),
+      help     = "H5 file and optionally address in which to output data " +
+                 "(default address: /dataset)")
 
     subparser.set_defaults(analysis = command_line)
 
@@ -58,52 +69,118 @@ def command_line(n_cores = 1, **kwargs):
     from multiprocessing import Pool
     from MDclt import pool_director
 
-    block_generator = Block_Generator(**kwargs)
-    block_acceptor  = Block_Acceptor(**kwargs)
-    block_acceptor.next()
-
-    # Serial
-    # for block in block_generator:
-    #     block()
-    #     block_acceptor.send(block)
-
-    # Parallel (processes)
-    pool = Pool(n_cores)
-    for block in pool.imap_unordered(pool_director, block_generator):
-        block_acceptor.send(block)
-    pool.close()
-    pool.join()
+    block_generator = Raw_Block_Generator(**kwargs)
+    block_acceptor  = Block_Acceptor(outputs = block_generator.outputs,
+                        **kwargs)
+    if n_cores == 1:                # Serial
+        for block in block_generator:
+            block()
+            block_acceptor.send(block)
+    else:                           # Parallel (processes)
+        pool = Pool(n_cores)
+        for block in pool.imap_unordered(pool_director, block_generator):
+            pass
+            block_acceptor.send(block)
+        pool.close()
+        pool.join()
 
     block_acceptor.close()
 
 ################################### CLASSES ####################################
-class Block(Block):
+class Raw_Block_Generator(primary.Primary_Block_Generator):
+    """
+    Generator class that prepares blocks of analysis
+    """
+
+    def __init__(self, infiles, dimensions, output, frames_per_file = None,
+          **kwargs):
+        """
+        Initializes generator
+
+        **Arguments:**
+            :*output*:          List including path to h5 file and
+                                address within h5 file
+            :*infiles*:         List of infiles
+            :*frames_per_file*: Number of frames in each infile
+            :*dimensions*:      Additional dimensions in dataset; if
+                                multidimensional (optional)
+
+        .. todo:
+            - Intelligently break lists of infiles into blocks larger
+              than 1
+        """
+
+        # Input
+        self.infiles           = infiles
+        self.frames_per_file   = frames_per_file
+        self.infiles_per_block = 5
+        if dimensions is None:
+            self.dimensions = []
+        else:
+            self.dimensions = dimensions
+
+        # Output
+        self.outputs = [(output[0], os.path.normpath(output[1]))]
+
+        # Action
+        self.dtype          = np.float32
+
+        super(Raw_Block_Generator, self).__init__(**kwargs)
+
+        # Output
+        self.outputs = [(output[0], os.path.normpath(output[1]),
+          tuple([self.final_slice.stop - self.final_slice.start]
+            + self.dimensions))]
+
+    def next(self):
+        """
+        Prepares and returns next Block of analysis
+        """
+        if len(self.infiles) == 0:
+            raise StopIteration()
+        else:
+            block_infiles = self.infiles[:self.infiles_per_block]
+            block_slice   = slice(self.start_index,
+              self.start_index + len(block_infiles) * self.frames_per_file, 1)
+
+            self.infiles      = self.infiles[self.infiles_per_block:]
+            self.start_index += len(block_infiles) * self.frames_per_file
+
+            return Raw_Block(infiles     = block_infiles,
+                             output      = self.outputs[0],
+                             slc         = block_slice, 
+                             dimensions  = self.dimensions,
+                             dtype       = self.dtype)
+
+class Raw_Block(Block):
     """
     Independent block of analysis
     """
-    def __init__(self, infiles, out_address, slc, dimensions = [], attrs = {},
-                 *args, **kwargs):
+    def __init__(self, infiles, output, dtype, slc, dimensions = [],
+          attrs = {}, **kwargs):
         """
         Initializes block of analysis
 
         **Arguments:**
             :*infiles*:    List of infiles
-            :*address*:    Address of dataset within h5 file
+            :*output*:     For each dataset, path to h5 file, address
+                           within h5 file, and if appropriate final
+                           shape of dataset; list of tuples
+            :*dtype*:      Data type of nascent dataset
             :*slc*:        Slice within dataset at which this block
                            will be stored
             :*dimensions*: Additional dimensions in dataset; if
                            multidimensional (optional)
             :*attrs*:      Attributes to add to dataset
         """
-        from collections import OrderedDict
-
-        super(Block, self).__init__(*args, **kwargs)
+        super(Raw_Block, self).__init__(**kwargs)
 
         self.infiles     = infiles
         self.dimensions  = dimensions
-        self.out_address = out_address
-        self.datasets    = OrderedDict({out_address:
-                             dict(slc = slc, attrs = attrs)})
+        self.output      = output
+        self.datasets    = {self.output: dict(slc = slc, attrs = attrs, 
+                             kwargs = dict(maxshape = [None] + dimensions,
+                             scaleoffset = 4))}
 
     def __call__(self, **kwargs):
         """
@@ -133,63 +210,6 @@ class Block(Block):
               [dataset.size / np.product(self.dimensions)] + self.dimensions)
 
         # Store in instance variable
-        self.datasets[self.out_address]["data"] = dataset
-
-class Block_Generator(primary.Block_Generator):
-    """
-    Generator class that yields blocks of analysis
-    """
-
-    def __init__(self, infiles, frames_per_file = None, dimensions = [],
-                 **kwargs):
-        """
-        Initializes generator
-
-        **Arguments:**
-            :*output*:          List including path to h5 file and
-                                address within h5 file
-            :*infiles*:         List of infiles
-            :*frames_per_file*: Number of frames in each infile
-                                (optional)
-            :*dimensions*:      Additional dimensions in dataset; if
-                                multidimensional (optional)
-
-        .. todo:
-            - Intelligently break lists of infiles into blocks larger
-              than 1
-        """
-
-        # Input
-        self.infiles           = infiles
-        self.frames_per_file   = frames_per_file
-        self.infiles_per_block = 5
-        self.dimensions        = dimensions
-
-        # Action
-        self.dtype          = np.float32
-        self.final_shape    = [len(infiles) * frames_per_file] + dimensions
-        self.dataset_kwargs = dict(chunks = True, compression = "gzip",
-          maxshape = [None] + dimensions, scaleoffset = 4)
-
-        super(Block_Generator, self).__init__(**kwargs)
-
-    def next(self):
-        """
-        Prepares and yields next Block of analysis
-        """
-        if len(self.infiles) == 0:
-            raise StopIteration()
-        else:
-            block_infiles = self.infiles[:self.infiles_per_block]
-            block_slice   = slice(self.start_index,
-              self.start_index + len(block_infiles) * self.frames_per_file, 1)
-
-            self.infiles      = self.infiles[self.infiles_per_block:]
-            self.start_index += len(block_infiles) * self.frames_per_file
-
-            return Block(infiles     = block_infiles,
-                         out_address = self.out_address,
-                         slc         = block_slice, 
-                         dimensions  = self.dimensions)
+        self.datasets[self.output]["data"] = dataset
 
 

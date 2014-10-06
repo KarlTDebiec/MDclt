@@ -22,10 +22,12 @@ if __name__ == "__main__":
       dest            = "tool",
       description     = "")
 
-    from MDclt.secondary import pmf
-    pmf.add_parser(tool_subparsers)
-    from MDclt.secondary import association
-    association.add_parser(tool_subparsers)
+    from MDclt.secondary import pdist
+    pdist.add_parser(tool_subparsers)
+    from MDclt.secondary import assign
+    assign.add_parser(tool_subparsers)
+    from MDclt.secondary import stateprobs
+    stateprobs.add_parser(tool_subparsers)
 
     # Parse arguments
     kwargs = vars(parser.parse_args())
