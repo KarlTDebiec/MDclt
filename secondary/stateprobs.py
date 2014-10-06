@@ -143,7 +143,6 @@ class StateProb_Analyzer(secondary.Secondary_Block_Generator):
         """
         Prepares string representation of output data
         """
-        # TODO: just load data if nothing new
         if hasattr(self, "datasets"):
             stateprob_ds = np.array(self.datasets.values()[0]["data"])
             titles = ""

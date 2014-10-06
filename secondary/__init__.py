@@ -96,9 +96,9 @@ class Secondary_Block_Generator(Block_Generator):
                     in_starts += [eval(attrs["slice"]).start]
                     in_stops  += [eval(attrs["slice"]).stop]
                 else:
-                    warn("'slice' not found in dataset " +
-                      "'{0}:{1}' attributes; ".format(in_path, in_address) +
-                      "assuming first dimension is time")
+#                    warn("'slice' not found in dataset " +
+#                      "'{0}:{1}' attributes; ".format(in_path, in_address) +
+#                      "assuming first dimension is time")
                     in_starts += [0]
                     in_stops  += [in_h5[in_address].shape[0]]
         in_start = np.max(in_starts)
