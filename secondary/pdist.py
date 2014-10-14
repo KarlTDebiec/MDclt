@@ -254,9 +254,12 @@ class PDist_Block_Generator(secondary.Secondary_Block_Generator):
             #   order to ensure that the same results are obtained for
             #   fresh and extended datasets
             with h5(self.coord_path) as coord_h5:
-                block_coord = np.round(np.array(coord_h5[self.coord_address]
-                  [block_slice]),
-                  int(str(coord_h5[self.coord_address].scaleoffset)[0]))
+                scaleoffset = coord_h5[self.coord_address].scaleoffset
+                block_coord = np.array(coord_h5[self.coord_address]
+                                [block_slice])
+                if scaleoffset is not None:
+                    scaleoffset = int(str(scaleoffset)[0])
+                    block_coord = np.round(block_coord, scaleoffset)
 
             # Iterate
             self.current_start += self.frames_per_block
@@ -619,11 +622,12 @@ class Hist_Block_Accumulator(PDist_Block_Accumulator):
             pdist["probability"][pdist["probability"] == 0.0] = np.nan
 
             super(Hist_Block_Accumulator, self).close(**kwargs)
-        
+
             blocks = np.array(blocks, dtype = 
               [("start",  np.int),
                ("stop",   np.int),
                ("count", (np.int, blocks[0][-1].shape))])
+
             self.datasets[self.outputs[1]]["data"] = blocks[
               np.argsort(blocks["start"])]
 

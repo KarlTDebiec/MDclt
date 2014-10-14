@@ -230,10 +230,10 @@ class Block_Generator(object):
                             out_starts += [eval(attrs["slice"]).start]
                             out_stops  += [eval(attrs["slice"]).stop]
                         else:
-                            warn("'slice' not found in dataset " +
-                              "'{0}:{1}' attributes; ".format(out_path,
-                              out_address) +
-                              "assuming first dimension is time")
+#                            warn("'slice' not found in dataset " +
+#                              "'{0}:{1}' attributes; ".format(out_path,
+#                              out_address) +
+#                              "assuming first dimension is time")
                             out_starts += [0]
                             out_stops  += [out_h5[out_address].shape[0]]
                 else:

@@ -198,7 +198,7 @@ class Assign_Block_Generator(secondary.Secondary_Block_Generator):
             raise StopIteration()
         else:
             # Determine slice indexes
-            if self.n_molecule_1 > 1 and self.n_molecule_2 > 1:
+            if self.n_molecule_1 >= 1 and self.n_molecule_2 >= 1:
                 block_slice = (slice(self.current_start, self.current_stop, 1),
                                 self.i, self.j)
                 attrs       = {"slice": str(block_slice[0])}
@@ -207,10 +207,16 @@ class Assign_Block_Generator(secondary.Secondary_Block_Generator):
                 attrs       = {"slice": str(block_slice)}
 
             # Load primary data from these indexes
+            #   NOTE: It is necessary to round to the scaleoffset in
+            #   order to ensure that the same results are obtained for
+            #   fresh and extended datasets
             with h5(self.coord_path) as coord_h5:
-                block_coord = np.round(np.array(coord_h5[self.coord_address]
-                  [block_slice]),
-                  int(str(coord_h5[self.coord_address].scaleoffset)[0]))
+                scaleoffset = coord_h5[self.coord_address].scaleoffset
+                block_coord = np.array(coord_h5[self.coord_address]
+                                [block_slice])
+                if scaleoffset is not None:
+                    scaleoffset = int(str(scaleoffset)[0])
+                    block_coord = np.round(block_coord, scaleoffset)
 
             # Iterate
             self.j     += 1

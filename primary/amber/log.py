@@ -143,10 +143,10 @@ class AmberLog_Block_Generator(primary.Primary_Block_Generator):
         # Determine dtype of input data
         self.get_dataset_format(**kwargs)
 
+        super(AmberLog_Block_Generator, self).__init__(**kwargs)
+
         # Disregard last infile, if applicable
         self.cut_incomplete_infiles(**kwargs)
-
-        super(AmberLog_Block_Generator, self).__init__(**kwargs)
 
         # Output
         self.outputs = [(output[0], os.path.normpath(output[1]),
@@ -254,6 +254,8 @@ class AmberLog_Block_Generator(primary.Primary_Block_Generator):
         """
         from subprocess import Popen, PIPE
 
+        if len(self.infiles) == 0:
+            return
         with open(os.devnull, "w") as fnull:
             command = "tail -n 1 {0}".format(self.infiles[-1])
             process = Popen(command,
@@ -264,7 +266,8 @@ class AmberLog_Block_Generator(primary.Primary_Block_Generator):
         if not (result.startswith("|  Total wall time:")          # pmemd.cuda
            or   result.startswith("|  Master Total wall time:")): # pmemd
             self.infiles.pop(-1)
-            self.final_shape[0] -= self.frames_per_file
+            self.final_slice = slice(self.final_slice.start, 
+              self.final_slice.stop - self.frames_per_file, 1)
 
 class AmberLog_Block(Block):
     """

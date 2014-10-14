@@ -212,7 +212,7 @@ class Assign_Analyzer(StateProb_Analyzer):
             Pstate[i] = float(assignments[assignments == i].size) / float(
                           assignments.size)
             if len(assignments.shape) > 1:
-               assignments_for_FP[:,i] = (np.sum(assignments == i, axis = 1) 
+                assignments_for_FP[:,i] = (np.sum(assignments == i, axis = 1) 
                                             / assignments.shape[1])
             else:
                 assignments_for_FP[:,i] = (assignments == i)
