@@ -1,6 +1,11 @@
-#!/usr/bin/python
+# -*- coding: utf-8 -*-
 #   MDclt.primary.raw.py
-#   Written by Karl Debiec on 14-06-30, last updated by Karl Debiec on 14-09-29
+#
+#   Copyright (C) 2012-2015 Karl T Debiec
+#   All rights reserved.
+#
+#   This software may be modified and distributed under the terms of the
+#   BSD license. See the LICENSE file for details.
 """
 Classes for transfer of data from raw text files to h5
 
@@ -79,7 +84,6 @@ def command_line(n_cores = 1, **kwargs):
     else:                           # Parallel (processes)
         pool = Pool(n_cores)
         for block in pool.imap_unordered(pool_director, block_generator):
-            pass
             block_acceptor.send(block)
         pool.close()
         pool.join()
@@ -123,7 +127,7 @@ class Raw_Block_Generator(primary.Primary_Block_Generator):
         self.outputs = [(output[0], os.path.normpath(output[1]))]
 
         # Action
-        self.dtype          = np.float32
+        self.dtype = np.float32
 
         super(Raw_Block_Generator, self).__init__(**kwargs)
 

@@ -1,7 +1,11 @@
-#!/usr/bin/python
 # -*- coding: utf-8 -*-
 #   MDclt.__init__.py
-#   Written by Karl Debiec on 12-02-12, last updated by Karl Debiec on 14-09-30
+#
+#   Copyright (C) 2012-2015 Karl T Debiec
+#   All rights reserved.
+#
+#   This software may be modified and distributed under the terms of the
+#   BSD license. See the LICENSE file for details.
 """
 Command line tools for analysis of molecular dynamics simulations
 
@@ -458,5 +462,3 @@ class Block_Acceptor(object):
                 i    -= 1
             i += 1
         self.received_slices = rs
-
-

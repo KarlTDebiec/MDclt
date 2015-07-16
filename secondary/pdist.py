@@ -1,7 +1,11 @@
-#!/usr/bin/python
 # -*- coding: utf-8 -*-
 #   MDclt.secondary.pdist.py
-#   Written by Karl Debiec on 12-08-15, last updated by Karl Debiec on 14-10-01
+#
+#   Copyright (C) 2012-2015 Karl T Debiec
+#   All rights reserved.
+#
+#   This software may be modified and distributed under the terms of the
+#   BSD license. See the LICENSE file for details.
 """
 Classes for calculation of probability density function
 

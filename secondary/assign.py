@@ -1,7 +1,11 @@
-#!/usr/bin/python
 # -*- coding: utf-8 -*-
 #   MDclt.secondary.assign.py
-#   Written by Karl Debiec on 12-08-15, last updated by Karl Debiec on 14-10-05
+#
+#   Copyright (C) 2012-2015 Karl T Debiec
+#   All rights reserved.
+#
+#   This software may be modified and distributed under the terms of the
+#   BSD license. See the LICENSE file for details.
 """
 Classes for state assignment
 
@@ -212,6 +216,7 @@ class Assign_Block_Generator(secondary.Secondary_Block_Generator):
             #   fresh and extended datasets
             with h5(self.coord_path) as coord_h5:
                 scaleoffset = coord_h5[self.coord_address].scaleoffset
+                print(scaleoffset, self.coord_address, block_slice)
                 block_coord = np.array(coord_h5[self.coord_address]
                                 [block_slice])
                 if scaleoffset is not None:

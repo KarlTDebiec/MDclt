@@ -1,6 +1,11 @@
-#!/usr/bin/python
-#   MDclt.secondary.Association.py
-#   Written by Karl Debiec on 12-08-15, last updated by Karl Debiec on 14-08-04
+# -*- coding: utf-8 -*-
+#   MDclt.secondary.association.py
+#
+#   Copyright (C) 2012-2015 Karl T Debiec
+#   All rights reserved.
+#
+#   This software may be modified and distributed under the terms of the
+#   BSD license. See the LICENSE file for details.
 """
 Classes for analysis of molecular association
 
@@ -81,11 +86,22 @@ def add_parser(subparsers, *args, **kwargs):
         :*args*:       Passed to subparsers.add_parser(...)
         :*kwargs*:     Passed to subparsers.add_parser(...)
     """
+    from MDclt import overridable_defaults
+
     subparser  = secondary.add_parser(subparsers,
       name     = "association",
       help     = "Analyzes molecular association")
     arg_groups = {ag.title:ag for ag in subparser._action_groups}
 
+    arg_groups["input"].add_argument(
+      "-log",
+      type     = str,
+      required = True,
+      nargs    = "+",
+      metavar  = ("H5_FILE", "ADDRESS"),
+      action   = overridable_defaults(nargs = 2, defaults = {1: "log"}),
+      help     = "H5 file and optionally address from which to load " + 
+                 "simulation log (default ADDRESS: log)")
     arg_groups["input"].add_argument(
       "-coord",
       type     = str,

@@ -1,6 +1,12 @@
 #!/usr/bin/python
+# -*- coding: utf-8 -*-
 #   MDclt_primary.py
-#   Written by Karl Debiec on 14-06-30, last updated by Karl Debiec on 14-07-09
+#
+#   Copyright (C) 2012-2015 Karl T Debiec
+#   All rights reserved.
+#
+#   This software may be modified and distributed under the terms of the
+#   BSD license. See the LICENSE file for details.
 """
 Command Line Tool to manage primary analysis of molecular dynamics simulations
 

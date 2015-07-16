@@ -1,6 +1,11 @@
-#!/usr/bin/python
-#   MDclt.primary.amber.py
-#   Written by Karl Debiec on 12-12-01, last updated by Karl Debiec on 14-09-29
+# -*- coding: utf-8 -*-
+#   MDclt.primary.amber.log.py
+#
+#   Copyright (C) 2012-2015 Karl T Debiec
+#   All rights reserved.
+#
+#   This software may be modified and distributed under the terms of the
+#   BSD license. See the LICENSE file for details.
 """
 Classes for transfer of AMBER simulation logs to h5
 """
@@ -132,7 +137,7 @@ class AmberLog_Block_Generator(primary.Primary_Block_Generator):
         # Input
         self.infiles           = infiles
         self.frames_per_file   = frames_per_file
-        self.infiles_per_block = 5
+        self.infiles_per_block = 1
 
         # Output
         self.outputs = [(output[0], os.path.normpath(output[1]))]
@@ -305,6 +310,7 @@ class AmberLog_Block(Block):
         """
 
         # Load raw data from each infile
+        print(self.infiles)
         raw_data = {raw_key: [] for raw_key in self.raw_keys}
         for infile in self.infiles:
             with open(infile, "r") as infile:
@@ -331,7 +337,12 @@ class AmberLog_Block(Block):
         self.datasets[self.output]["data"]["time"] = (np.array(
           raw_data["TIME(PS)"], np.float) / 1000) + self.time_offset
         for raw_key, new_key in zip(self.raw_keys[1:], self.new_keys[1:]):
-            self.datasets[self.output]["data"][new_key] = np.array(
-              raw_data[raw_key])
+            try:
+                self.datasets[self.output]["data"][new_key] = np.array(
+                  raw_data[raw_key])
+            except:
+                print(raw_data[raw_key])
+                print(raw_key)
+                raise
 
 
