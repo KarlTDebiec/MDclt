@@ -1,6 +1,11 @@
-#!/usr/bin/python
-#   MDclt.primary.amber.py
-#   Written by Karl Debiec on 12-12-01, last updated by Karl Debiec on 14-09-29
+# -*- coding: utf-8 -*-
+#   MDclt.primary.amber.log.py
+#
+#   Copyright (C) 2012-2015 Karl T Debiec
+#   All rights reserved.
+#
+#   This software may be modified and distributed under the terms of the
+#   BSD license. See the LICENSE file for details.
 """
 Classes for transfer of AMBER simulation logs to h5
 """

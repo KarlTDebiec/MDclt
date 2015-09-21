@@ -1,7 +1,11 @@
-#!/usr/bin/python
 # -*- coding: utf-8 -*-
-#   FP_Block_Averager.py
-#   Written by Karl Debiec on 12-08-15, last updated by Karl Debiec on 14-10-05
+#   MDclt.FP_Block_Averager.py
+#
+#   Copyright (C) 2012-2015 Karl T Debiec
+#   All rights reserved.
+#
+#   This software may be modified and distributed under the terms of the
+#   BSD license. See the LICENSE file for details.
 """
 Command-line tool to estimate standard error using the block-averaging
 method of Flyvbjerg and Petersen
@@ -10,7 +14,7 @@ Flyvbjerg, H., and Petersen, H. G. Error estimates on averages of
 correlated data. Journal of Chemical Physics. 1989. 91 (1). 461-466.
 """
 ################################### MODULES ####################################
-from __future__ import division, print_function
+from __future__ import absolute_import,division,print_function,unicode_literals
 import os, sys
 import numpy as np
 ################################### CLASSES ####################################
@@ -410,5 +414,3 @@ if __name__ == "__main__":
     block_averager.calculate_blocks()
     block_averager.fit_curves()
     block_averager.plot(**kwargs)
-
-

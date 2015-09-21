@@ -1,6 +1,11 @@
-#!/usr/bin/python
-#   MDclt.secondary.Association.py
-#   Written by Karl Debiec on 12-08-15, last updated by Karl Debiec on 14-08-04
+# -*- coding: utf-8 -*-
+#   MDclt.secondary.association.py
+#
+#   Copyright (C) 2012-2015 Karl T Debiec
+#   All rights reserved.
+#
+#   This software may be modified and distributed under the terms of the
+#   BSD license. See the LICENSE file for details.
 """
 Classes for analysis of molecular association
 
