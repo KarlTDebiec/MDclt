@@ -368,6 +368,7 @@ class Block_Acceptor(object):
         try:
             out_h5s = {out_path:h5(out_path) for out_path in
                         set([output[0] for output in self.outputs])}
+
             while(True):
 
                 block = yield

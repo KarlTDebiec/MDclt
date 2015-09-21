@@ -212,6 +212,7 @@ class Assign_Block_Generator(secondary.Secondary_Block_Generator):
             #   fresh and extended datasets
             with h5(self.coord_path) as coord_h5:
                 scaleoffset = coord_h5[self.coord_address].scaleoffset
+                print(scaleoffset, self.coord_address, block_slice)
                 block_coord = np.array(coord_h5[self.coord_address]
                                 [block_slice])
                 if scaleoffset is not None:

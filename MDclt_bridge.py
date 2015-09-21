@@ -1,6 +1,6 @@
 #!/usr/bin/python
 #   MDclt_bridge.py
-#   Written by Karl Debiec on 14-08-14, last updated by Karl Debiec on 14-08-14
+#   Written by Karl Debiec on 14-08-14, last updated by Karl Debiec on 14-09-21
 """
 Command Line Tool to convert analysis conducted with previous version
 of scripts (i.e. divided into segments) into current format (i.e.
@@ -28,18 +28,18 @@ def bridge(input, output, input2 = None, **kwargs):
         return dataset, attrs
 
     # Load data
-    dataset, attrs = load_input(in_path = input[0], in_address = input[1], **kwargs)
+    dataset, attrs = load_input(in_path=input[0], in_address=input[1],
+      **kwargs)
     if input2 is not None:
-        dataset2, _ = load_input(in_path = input2[0], in_address = input2[1],
+        dataset2, _ = load_input(in_path=input2[0], in_address=input2[1],
           **kwargs)
         stacked = np.column_stack((dataset, dataset2))
         minimum = np.min(stacked , axis = 1)
         dataset = minimum[:, np.newaxis]
 
-    block = Bridge_Block(dataset = dataset, attrs = attrs, address = output[1])
-        
+    block = Bridge_Block(dataset=dataset, attrs=attrs, output=tuple(output))
 
-    block_acceptor = Block_Acceptor(out_path = output[0])
+    block_acceptor = Block_Acceptor(outputs=[tuple(output)])
     block_acceptor.next()
     block_acceptor.send(block)
     block_acceptor.close()
@@ -48,10 +48,13 @@ def bridge(input, output, input2 = None, **kwargs):
 class Bridge_Block(Block):
     """
     """
-    def __init__(self, dataset, attrs, address, **kwargs):
+    def __init__(self, dataset, output, attrs=None, **kwargs):
         """
         """
-        self.datasets = {address: dict(
+        if attrs is None:
+            attrs = {}
+        self.output = output
+        self.datasets = {self.output: dict(
           data  = dataset,
           attrs = attrs)}
 

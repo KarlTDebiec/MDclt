@@ -132,7 +132,7 @@ class AmberLog_Block_Generator(primary.Primary_Block_Generator):
         # Input
         self.infiles           = infiles
         self.frames_per_file   = frames_per_file
-        self.infiles_per_block = 5
+        self.infiles_per_block = 1
 
         # Output
         self.outputs = [(output[0], os.path.normpath(output[1]))]
@@ -305,6 +305,7 @@ class AmberLog_Block(Block):
         """
 
         # Load raw data from each infile
+        print(self.infiles)
         raw_data = {raw_key: [] for raw_key in self.raw_keys}
         for infile in self.infiles:
             with open(infile, "r") as infile:
@@ -331,7 +332,12 @@ class AmberLog_Block(Block):
         self.datasets[self.output]["data"]["time"] = (np.array(
           raw_data["TIME(PS)"], np.float) / 1000) + self.time_offset
         for raw_key, new_key in zip(self.raw_keys[1:], self.new_keys[1:]):
-            self.datasets[self.output]["data"][new_key] = np.array(
-              raw_data[raw_key])
+            try:
+                self.datasets[self.output]["data"][new_key] = np.array(
+                  raw_data[raw_key])
+            except:
+                print(raw_data[raw_key])
+                print(raw_key)
+                raise
 
 

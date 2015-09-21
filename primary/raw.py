@@ -79,7 +79,6 @@ def command_line(n_cores = 1, **kwargs):
     else:                           # Parallel (processes)
         pool = Pool(n_cores)
         for block in pool.imap_unordered(pool_director, block_generator):
-            pass
             block_acceptor.send(block)
         pool.close()
         pool.join()
@@ -123,7 +122,7 @@ class Raw_Block_Generator(primary.Primary_Block_Generator):
         self.outputs = [(output[0], os.path.normpath(output[1]))]
 
         # Action
-        self.dtype          = np.float32
+        self.dtype = np.float32
 
         super(Raw_Block_Generator, self).__init__(**kwargs)
 
